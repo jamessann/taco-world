@@ -1,10 +1,11 @@
 // Config at top for easy tuning
 const GIANT_TACO_CONFIG = {
   name:           'Giant Taco',
-  textureKey:     'giantTaco',
-  color:          0xFF6347,  // tomato red
+  color:          0xFF6347,  // tomato red fallback
   width:          160,
   height:         160,
+  displayWidth:   200,       // rendered bigger than the fighters
+  displayHeight:  200,
   maxHp:          150,       // tankier boss
   moveSpeed:      180,       // slow but hits hard
   jumpSpeed:      500,
@@ -13,6 +14,16 @@ const GIANT_TACO_CONFIG = {
   heavyDamage:    30,
   lightCooldown:  350,
   heavyCooldown:  1000,
+
+  textures: {
+    IDLE:         'gt_idle',
+    WALK:         'gt_walk',
+    ATTACK_LIGHT: 'gt_light_attack',
+    ATTACK_HEAVY: 'gt_heavy_attack',
+    BLOCK:        'gt_block',
+    HIT:          'gt_hit',
+    KO:           'gt_ko',
+  },
 };
 
 // AI timing constants

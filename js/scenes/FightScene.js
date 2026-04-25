@@ -17,18 +17,21 @@ class FightScene extends Phaser.Scene {
   // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
   init(data) {
-    this.roundNumber  = data.roundNumber || 1;
-    this.p1Wins       = data.p1Wins      || 0;
-    this.p2Wins       = data.p2Wins      || 0;
-    this.isCPURound   = (this.roundNumber === 3);
-    this.gameState    = 'COUNTDOWN';
-    this.roundTimeLeft = ROUND_TIME;
-    this._timerAccum  = 0;
+    this.mode           = data.mode           || '1P';
+    this.roundNumber    = data.roundNumber    || 1;
+    this.p1Wins         = data.p1Wins         || 0;
+    this.p2Wins         = data.p2Wins         || 0;
+    this.isBossRound    = data.isBossRound    || false;
+    this.isTiebreaker   = data.isTiebreaker   || false;
+    this.bossChallenger = data.bossChallenger || 'P1'; // 'P1' or 'P2'
+    // P2 is CPU when it's the boss round (Giant Taco) OR 1P mode (Taco Girl as CPU)
+    this.isP2CPU        = this.isBossRound || this.mode === '1P';
+    this.gameState      = 'COUNTDOWN';
+    this.roundTimeLeft  = ROUND_TIME;
+    this._timerAccum    = 0;
     this._roundEndFired = false;
-    // Plain POJOs for smooth HP — Phaser tweens plain objects reliably;
-    // tweening arbitrary scene-instance properties doesn't always work.
-    this._p1Smooth = { hp: 100 };
-    this._p2Smooth = { hp: 100 };
+    this._p1Smooth      = { hp: 100 };
+    this._p2Smooth      = { hp: 100 };
   }
 
   create() {
@@ -59,19 +62,25 @@ class FightScene extends Phaser.Scene {
   // ─── Fighters ────────────────────────────────────────────────────────────────
 
   _setupFighters() {
-    const W = this.scale.width;
-    const spawnY = FLOOR_Y - 50; // center of fighter, feet at FLOOR_Y
+    const W      = this.scale.width;
+    const spawnY = FLOOR_Y - 50;
 
-    this.fighter1 = new TacoBoy(this, 200, spawnY);
-    this.fighter2 = this.isCPURound
-      ? new GiantTaco(this, W - 220, FLOOR_Y - 80)
-      : new TacoGirl(this, W - 200, spawnY);
+    if (this.isBossRound) {
+      // The round winner becomes fighter1 (left, P1 controls).
+      // If P2 won the series they still use P1-side controls in the boss fight.
+      this.fighter1 = this.bossChallenger === 'P2'
+        ? new TacoGirl(this, 200, spawnY)
+        : new TacoBoy(this, 200, spawnY);
+      this.fighter2 = new GiantTaco(this, W - 220, FLOOR_Y - 80);
+    } else {
+      // Normal round: TacoBoy left, TacoGirl right
+      this.fighter1 = new TacoBoy(this, 200, spawnY);
+      this.fighter2 = new TacoGirl(this, W - 200, spawnY);
+    }
 
-    // Ground colliders
     this.physics.add.collider(this.fighter1.rect, this._groundObj);
     this.physics.add.collider(this.fighter2.rect, this._groundObj);
 
-    // Sync smooth HP POJOs to each fighter's actual starting HP
     this._p1Smooth.hp = this.fighter1.hp;
     this._p2Smooth.hp = this.fighter2.hp;
   }
@@ -101,12 +110,12 @@ class FightScene extends Phaser.Scene {
     this._p2BarBg   = this.add.rectangle(P2_BAR_RX - BAR_W / 2, BAR_Y, BAR_W, BAR_H, 0x555555).setDepth(DEPTH + 1);
     // Fill — origin right-centre so scaleX shrinks from left
     this._p2BarFill = this.add.rectangle(P2_BAR_RX, BAR_Y, BAR_W, BAR_H,
-      this.isCPURound ? 0xe74c3c : 0xe91e8c).setOrigin(1, 0.5).setDepth(DEPTH + 2);
+      this.isBossRound ? 0xe74c3c : 0xe91e8c).setOrigin(1, 0.5).setDepth(DEPTH + 2);
 
     const p2Name = this.fighter2.config.name;
     this.add.text(P2_BAR_RX, HUD_NAME_Y, p2Name, {
       fontSize: '13px', fontFamily: 'Arial Black, Arial',
-      fill: this.isCPURound ? '#FF6347' : '#FF69B4',
+      fill: this.isBossRound ? '#FF6347' : '#FF69B4',
       stroke: '#000', strokeThickness: 3
     }).setOrigin(1, 0).setDepth(DEPTH + 3);
 
@@ -165,8 +174,8 @@ class FightScene extends Phaser.Scene {
   // ─── Touch controls ───────────────────────────────────────────────────────────
 
   _setupTouchControls() {
-    // Pass null as fighter2 for CPU rounds so the touch pad is hidden for P2
-    const f2 = this.isCPURound ? null : this.fighter2;
+    // Pass null as fighter2 when P2 is CPU so their touch pad is hidden
+    const f2 = this.isP2CPU ? null : this.fighter2;
     this._touchControls = new TouchControls(this, this.fighter1, f2);
   }
 
@@ -175,14 +184,20 @@ class FightScene extends Phaser.Scene {
   _startRoundCountdown() {
     const W = this.scale.width;
     const H = this.scale.height;
-    const isFinal = this.isCPURound;
-
-    const isTiebreaker = (this.roundNumber === 2);
-
-    const roundLabel = isFinal ? 'BOSS ROUND!' : `Round ${this.roundNumber}`;
-    const subLabel   = isFinal      ? 'Survive the Giant Taco!'
-                     : isTiebreaker ? '🌮  Tie the series and the Giant Taco Boss awaits!  🌮'
-                     : '';
+    let roundLabel, subLabel;
+    if (this.isBossRound) {
+      roundLabel = 'BOSS ROUND!';
+      subLabel   = 'Survive the Giant Taco!';
+    } else if (this.isTiebreaker) {
+      roundLabel = 'TIEBREAKER!';
+      subLabel   = '🌮  Winner fights the Giant Taco Boss!  🌮';
+    } else if (this.mode === '1P') {
+      roundLabel = 'Round 1';
+      subLabel   = '🌮  Beat Taco Girl to face the Giant Taco Boss!  🌮';
+    } else {
+      roundLabel = `Round ${this.roundNumber}`;
+      subLabel   = this.roundNumber >= 2 ? '🌮  Win to fight the Giant Taco Boss!  🌮' : '';
+    }
 
     const roundText = this.add.text(W / 2, H / 2 - 20, roundLabel, {
       fontSize: '56px', fontFamily: 'Arial Black, Arial',
@@ -265,8 +280,8 @@ class FightScene extends Phaser.Scene {
       this.fighter2.faceOpponent(this.fighter1);
     }
 
-    // CPU AI
-    if (this.isCPURound) {
+    // CPU AI (Taco Girl in 1P mode, Giant Taco in boss round)
+    if (this.isP2CPU) {
       this.fighter2.updateCPU(delta, this.fighter1);
     }
 
@@ -309,8 +324,8 @@ class FightScene extends Phaser.Scene {
     if (k.p1Block.isDown) f1.startBlock();
     else f1.stopBlock();
 
-    // ── Player 2 (human only) ──
-    if (!this.isCPURound) {
+    // ── Player 2 (human only — not active in 1P mode or boss rounds) ──
+    if (!this.isP2CPU) {
       const f2 = this.fighter2;
       let p2Moving = false;
       if (k.p2Left.isDown)  { f2.moveLeft();  p2Moving = true; }
@@ -423,40 +438,86 @@ class FightScene extends Phaser.Scene {
   }
 
   _endRound(winnerId, reason) {
-    // Stop fighters
     this.fighter1.physBody.setVelocityX(0);
     this.fighter2.physBody.setVelocityX(0);
 
-    // Tally wins
     if (winnerId === 1) this.p1Wins++;
     else                this.p2Wins++;
     this._drawPips();
 
-    // Splash text
+    // Fade in the round-win stage behind the fighters
+    if (this.textures.exists('roundWinBg')) {
+      const W = this.scale.width;
+      const H = this.scale.height;
+      const rwBg = this.add.image(W / 2, H / 2, 'roundWinBg')
+        .setDisplaySize(W, H)
+        .setDepth(1)   // behind fighters (depth 5) but above fight arena (depth 0)
+        .setAlpha(0);
+      this.tweens.add({ targets: rwBg, alpha: 1, duration: 500, ease: 'Power2' });
+    }
+
     this._showRoundEndBanner(reason, winnerId);
+    this._bounceWinner(winnerId === 1 ? this.fighter1 : this.fighter2);
 
-    // Winning fighter bounce
-    const winner = winnerId === 1 ? this.fighter1 : this.fighter2;
-    this._bounceWinner(winner);
-
-    // Decide: next round or game over?
     this.time.delayedCall(2800, () => {
-      if (this.p1Wins >= 2 || this.p2Wins >= 2 || this.isCPURound) {
-        const winnerFighter = this.p1Wins > this.p2Wins ? this.fighter1 : this.fighter2;
-        const winnerName  = winnerFighter.config.name;
-        const winnerColor = winnerFighter.config.color;
-        const victoryKey  = winnerFighter.config.victoryTextureKey || null;
+      const _goGameOver = (fighterId) => {
+        const f   = fighterId === 1 ? this.fighter1 : this.fighter2;
         this.scene.start('GameOverScene', {
-          winnerName, winnerColor,
+          winnerName:        f.config.name,
+          winnerColor:       f.config.color,
+          p1Wins:            this.p1Wins,
+          p2Wins:            this.p2Wins,
+          victoryTextureKey: f.config.victoryTextureKey || null,
+        });
+      };
+
+      // ── Boss round — always the final fight ──────────────────────────────
+      if (this.isBossRound) {
+        _goGameOver(winnerId);
+        return;
+      }
+
+      // ── 1 Player mode ────────────────────────────────────────────────────
+      if (this.mode === '1P') {
+        if (winnerId === 1) {
+          // Human wins → face the boss
+          this.scene.start('FightScene', {
+            mode: '1P', roundNumber: 2,
+            p1Wins: this.p1Wins, p2Wins: this.p2Wins,
+            isBossRound: true, bossChallenger: 'P1',
+          });
+        } else {
+          // CPU Taco Girl wins — game over
+          _goGameOver(2);
+        }
+        return;
+      }
+
+      // ── 2 Player mode ────────────────────────────────────────────────────
+      // Always play at least 2 rounds before the boss
+      if (this.roundNumber < 2 && !this.isTiebreaker) {
+        this.scene.start('FightScene', {
+          mode: '2P', roundNumber: 2,
           p1Wins: this.p1Wins, p2Wins: this.p2Wins,
-          victoryTextureKey: victoryKey,
+          isBossRound: false, isTiebreaker: false,
+        });
+        return;
+      }
+
+      // After round 2 (or a tiebreaker), determine the boss challenger
+      if (this.p1Wins === this.p2Wins) {
+        // Exactly tied — sudden-death tiebreaker
+        this.scene.start('FightScene', {
+          mode: '2P', roundNumber: this.roundNumber + 1,
+          p1Wins: this.p1Wins, p2Wins: this.p2Wins,
+          isBossRound: false, isTiebreaker: true,
         });
       } else {
-        // Next round
+        const bossChallenger = this.p1Wins > this.p2Wins ? 'P1' : 'P2';
         this.scene.start('FightScene', {
-          roundNumber: this.roundNumber + 1,
-          p1Wins: this.p1Wins,
-          p2Wins: this.p2Wins
+          mode: '2P', roundNumber: this.roundNumber + 1,
+          p1Wins: this.p1Wins, p2Wins: this.p2Wins,
+          isBossRound: true, bossChallenger,
         });
       }
     });

@@ -306,6 +306,44 @@ class Fighter {
       this.state !== STATES.BLOCK;
   }
 
+  // ─── CPU AI (base — can be overridden per character) ─────────────────────────
+
+  updateCPU(delta, target) {
+    if (!this.isAlive || !target || !target.isAlive) return;
+    if (this.state === STATES.HIT || this.state === STATES.KO) return;
+
+    // Lazily initialise the CPU attack timer
+    if (this._cpuTimer === undefined) {
+      const min = this.config.cpuAttackIntervalMin || 1200;
+      const max = this.config.cpuAttackIntervalMax || 2200;
+      this._cpuTimer = min + Math.random() * (max - min);
+    }
+
+    const engageDist = this.config.cpuEngageDistance || 120;
+    const dist = Math.abs(this.x - target.x);
+
+    // Move toward target until within engage range
+    if (dist > engageDist) {
+      if (target.x < this.x) this.moveLeft();
+      else                    this.moveRight();
+    } else {
+      this.stopMoving();
+    }
+
+    // Attack countdown
+    this._cpuTimer -= delta;
+    if (this._cpuTimer <= 0 && dist <= engageDist + 50) {
+      const roll = Math.random();
+      if      (roll < 0.40) this.lightAttack();
+      else if (roll < 0.75) this.heavyAttack();
+      const min = this.config.cpuAttackIntervalMin || 1200;
+      const max = this.config.cpuAttackIntervalMax || 2200;
+      this._cpuTimer = min + Math.random() * (max - min);
+    }
+
+    this.faceOpponent(target);
+  }
+
   // ─── Per-frame update ─────────────────────────────────────────────────────────
 
   update(delta) {

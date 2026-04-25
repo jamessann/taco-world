@@ -15,8 +15,12 @@ class GameOverScene extends Phaser.Scene {
     const W = this.scale.width;
     const H = this.scale.height;
 
-    // Dark dramatic backdrop
-    this.add.rectangle(W / 2, H / 2, W, H, 0x0d0d1a);
+    // Stage background
+    if (this.textures.exists('gameOverBg')) {
+      this.add.image(W / 2, H / 2, 'gameOverBg').setDisplaySize(W, H);
+    } else {
+      this.add.rectangle(W / 2, H / 2, W, H, 0x0d0d1a); // fallback
+    }
 
     // Spotlight ring under winner
     const spotlight = this.add.graphics();
