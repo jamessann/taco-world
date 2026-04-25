@@ -23,7 +23,7 @@ const TACO_BOY_CONFIG = {
     JUMP:         'tb_jump',
     ATTACK_LIGHT: 'tb_light_attack',
     ATTACK_HEAVY: 'tb_heavy_attack',
-    BLOCK:        'tb_block',
+    BLOCK:        'tb_crouch',
     HIT:          'tb_hit',
     KO:           'tb_ko',
   },
