@@ -26,6 +26,7 @@ class FightScene extends Phaser.Scene {
     this.bossChallenger = data.bossChallenger || 'P1'; // 'P1' or 'P2'
     // P2 is CPU when it's the boss round (Giant Taco) OR 1P mode (Taco Girl as CPU)
     this.isP2CPU        = this.isBossRound || this.mode === '1P';
+    this.difficulty     = data.difficulty  || 'medium';
     this.gameState      = 'COUNTDOWN';
     this.roundTimeLeft  = ROUND_TIME;
     this._timerAccum    = 0;
@@ -38,8 +39,8 @@ class FightScene extends Phaser.Scene {
     this._setupStage();
     this._setupFighters();
     this._setupHUD();
-    this._setupInput();
     this._setupTouchControls();
+    this._setupPowerUps();
     this._startRoundCountdown();
   }
 
@@ -81,8 +82,29 @@ class FightScene extends Phaser.Scene {
     this.physics.add.collider(this.fighter1.rect, this._groundObj);
     this.physics.add.collider(this.fighter2.rect, this._groundObj);
 
+    // Apply difficulty scaling to CPU fighter's stats
+    if (this.isP2CPU) {
+      const d = this._cpuDifficultyConfig();
+      const c = this.fighter2.config;
+      c.lightDamage          = Math.round(c.lightDamage  * d.damageMult);
+      c.heavyDamage          = Math.round(c.heavyDamage  * d.damageMult);
+      c.cpuAttackIntervalMin = d.intervalMin;
+      c.cpuAttackIntervalMax = d.intervalMax;
+      c.cpuEngageDistance    = d.engageDist;
+    }
+
     this._p1Smooth.hp = this.fighter1.hp;
     this._p2Smooth.hp = this.fighter2.hp;
+  }
+
+  // Returns CPU difficulty overrides based on this.difficulty
+  _cpuDifficultyConfig() {
+    const presets = {
+      easy:   { damageMult: 0.65, intervalMin: 2400, intervalMax: 4000, engageDist: 160 },
+      medium: { damageMult: 1.0,  intervalMin: 1200, intervalMax: 2200, engageDist: 120 },
+      hard:   { damageMult: 1.4,  intervalMin: 380,  intervalMax: 850,  engageDist: 90  },
+    };
+    return presets[this.difficulty] || presets.medium;
   }
 
   // ─── HUD ─────────────────────────────────────────────────────────────────────
@@ -152,24 +174,7 @@ class FightScene extends Phaser.Scene {
     }
   }
 
-  // ─── Input ───────────────────────────────────────────────────────────────────
-
-  _setupInput() {
-    this.keys = this.input.keyboard.addKeys({
-      p1Left:  'A',
-      p1Right: 'D',
-      p1Jump:  'W',
-      p1Block: 'S',
-      p1Light: 'F',
-      p1Heavy: 'G',
-      p2Left:  Phaser.Input.Keyboard.KeyCodes.LEFT,
-      p2Right: Phaser.Input.Keyboard.KeyCodes.RIGHT,
-      p2Jump:  Phaser.Input.Keyboard.KeyCodes.UP,
-      p2Block: Phaser.Input.Keyboard.KeyCodes.DOWN,
-      p2Light: 'K',
-      p2Heavy: 'L'
-    });
-  }
+  // Keyboard input removed — game is touch-only (iPad).
 
   // ─── Touch controls ───────────────────────────────────────────────────────────
 
@@ -267,17 +272,17 @@ class FightScene extends Phaser.Scene {
   update(time, delta) {
     if (this.gameState !== 'FIGHTING') return;
 
-    this._handleInput();
     this.fighter1.update(delta);
     this.fighter2.update(delta);
 
-    // Fighter always faces opponent while idle/walking
-    if (this.fighter1.state === STATES.IDLE || this.fighter1.state === STATES.WALK) {
-      this.fighter1.faceOpponent(this.fighter2);
-    }
-    if (!this.isCPURound &&
+    // Human fighter 2 faces opponent while idle/walking (in 2P mode)
+    if (!this.isP2CPU &&
         (this.fighter2.state === STATES.IDLE || this.fighter2.state === STATES.WALK)) {
       this.fighter2.faceOpponent(this.fighter1);
+    }
+    // Fighter 1 always faces opponent while idle/walking
+    if (this.fighter1.state === STATES.IDLE || this.fighter1.state === STATES.WALK) {
+      this.fighter1.faceOpponent(this.fighter2);
     }
 
     // CPU AI (Taco Girl in 1P mode, Giant Taco in boss round)
@@ -288,6 +293,9 @@ class FightScene extends Phaser.Scene {
     // Bidirectional hit detection
     this._checkHit(this.fighter1, this.fighter2);
     this._checkHit(this.fighter2, this.fighter1);
+
+    // Power-ups
+    this._updatePowerUps(delta);
 
     // Round timer
     this._timerAccum += delta;
@@ -301,44 +309,6 @@ class FightScene extends Phaser.Scene {
 
     this._updateHealthBars();
     this._checkRoundEnd();
-  }
-
-  // ─── Input handling ──────────────────────────────────────────────────────────
-
-  _handleInput() {
-    const k  = this.keys;
-    const f1 = this.fighter1;
-    const tc = this._touchControls;   // may be null briefly during init
-
-    // ── Player 1 ──
-    let p1Moving = false;
-    if (k.p1Left.isDown)  { f1.moveLeft();  p1Moving = true; }
-    if (k.p1Right.isDown) { f1.moveRight(); p1Moving = true; }
-    // Only stop via keyboard if the touch joystick isn't currently driving P1
-    if (!p1Moving && !tc?.joystickActive(0)) f1.stopMoving();
-
-    if (Phaser.Input.Keyboard.JustDown(k.p1Jump))  f1.jump();
-    if (Phaser.Input.Keyboard.JustDown(k.p1Light)) f1.lightAttack();
-    if (Phaser.Input.Keyboard.JustDown(k.p1Heavy)) f1.heavyAttack();
-
-    if (k.p1Block.isDown) f1.startBlock();
-    else f1.stopBlock();
-
-    // ── Player 2 (human only — not active in 1P mode or boss rounds) ──
-    if (!this.isP2CPU) {
-      const f2 = this.fighter2;
-      let p2Moving = false;
-      if (k.p2Left.isDown)  { f2.moveLeft();  p2Moving = true; }
-      if (k.p2Right.isDown) { f2.moveRight(); p2Moving = true; }
-      if (!p2Moving && !tc?.joystickActive(1)) f2.stopMoving();
-
-      if (Phaser.Input.Keyboard.JustDown(k.p2Jump))  f2.jump();
-      if (Phaser.Input.Keyboard.JustDown(k.p2Light)) f2.lightAttack();
-      if (Phaser.Input.Keyboard.JustDown(k.p2Heavy)) f2.heavyAttack();
-
-      if (k.p2Block.isDown) f2.startBlock();
-      else f2.stopBlock();
-    }
   }
 
   // ─── Hit detection ───────────────────────────────────────────────────────────
@@ -356,10 +326,11 @@ class FightScene extends Phaser.Scene {
     // Landed!
     attacker.attackHitLanded = true;
 
-    const isHeavy = attacker.state === STATES.ATTACK_HEAVY;
-    const baseDmg = isHeavy ? attacker.config.heavyDamage : attacker.config.lightDamage;
-    const kbDir   = attacker.facingRight ? 1 : -1;
-    const dmg     = defender.takeDamage(baseDmg, kbDir);
+    const isHeavy  = attacker.state === STATES.ATTACK_HEAVY;
+    const baseDmg  = isHeavy ? attacker.config.heavyDamage : attacker.config.lightDamage;
+    const kbDir    = attacker.facingRight ? 1 : -1;
+    const finalDmg = Math.ceil(baseDmg * (attacker._damageMult || 1));
+    const dmg      = defender.takeDamage(finalDmg, kbDir);
 
     // Tween the plain HP POJO — kill any in-flight tween first so they don't fight each other
     if (defender === this.fighter1) {
@@ -482,7 +453,7 @@ class FightScene extends Phaser.Scene {
         if (winnerId === 1) {
           // Human wins → face the boss
           this.scene.start('FightScene', {
-            mode: '1P', roundNumber: 2,
+            mode: '1P', roundNumber: 2, difficulty: this.difficulty,
             p1Wins: this.p1Wins, p2Wins: this.p2Wins,
             isBossRound: true, bossChallenger: 'P1',
           });
@@ -497,7 +468,7 @@ class FightScene extends Phaser.Scene {
       // Always play at least 2 rounds before the boss
       if (this.roundNumber < 2 && !this.isTiebreaker) {
         this.scene.start('FightScene', {
-          mode: '2P', roundNumber: 2,
+          mode: '2P', roundNumber: 2, difficulty: this.difficulty,
           p1Wins: this.p1Wins, p2Wins: this.p2Wins,
           isBossRound: false, isTiebreaker: false,
         });
@@ -508,14 +479,14 @@ class FightScene extends Phaser.Scene {
       if (this.p1Wins === this.p2Wins) {
         // Exactly tied — sudden-death tiebreaker
         this.scene.start('FightScene', {
-          mode: '2P', roundNumber: this.roundNumber + 1,
+          mode: '2P', roundNumber: this.roundNumber + 1, difficulty: this.difficulty,
           p1Wins: this.p1Wins, p2Wins: this.p2Wins,
           isBossRound: false, isTiebreaker: true,
         });
       } else {
         const bossChallenger = this.p1Wins > this.p2Wins ? 'P1' : 'P2';
         this.scene.start('FightScene', {
-          mode: '2P', roundNumber: this.roundNumber + 1,
+          mode: '2P', roundNumber: this.roundNumber + 1, difficulty: this.difficulty,
           p1Wins: this.p1Wins, p2Wins: this.p2Wins,
           isBossRound: true, bossChallenger,
         });
@@ -560,5 +531,118 @@ class FightScene extends Phaser.Scene {
       yoyo: true,
       repeat: 3
     });
+  }
+
+  // ─── Power-ups ───────────────────────────────────────────────────────────────
+
+  _setupPowerUps() {
+    this._powerUps     = [];
+    this._puTimer      = 0;
+    this._puInterval   = Phaser.Math.Between(7000, 11000); // ms until first spawn
+  }
+
+  _updatePowerUps(delta) {
+    this._puTimer += delta;
+    if (this._puTimer >= this._puInterval && this._powerUps.length < 3) {
+      this._puTimer    = 0;
+      this._puInterval = Phaser.Math.Between(8000, 13000);
+      this._spawnPowerUp();
+    }
+    this._checkPowerUpCollisions();
+  }
+
+  _spawnPowerUp() {
+    const W = this.scale.width;
+    const types = [
+      { type: 'heal',   emoji: '❤️',  color: 0xff4488, label: '+25 HP'       },
+      { type: 'damage', emoji: '💥',  color: 0xff6600, label: 'POWER UP!'    },
+      { type: 'speed',  emoji: '⚡',  color: 0xffcc00, label: 'SPEED UP!'    },
+    ];
+    const t  = Phaser.Utils.Array.GetRandom(types);
+    const x  = Phaser.Math.Between(180, W - 180);
+    const y  = FLOOR_Y - 28;
+
+    // Glowing circle
+    const gfx = this.add.circle(x, y, 24, t.color, 0.88).setDepth(4);
+    const rim = this.add.circle(x, y, 27, 0xffffff, 0.4).setDepth(3);
+    const lbl = this.add.text(x, y, t.emoji, {
+      fontSize: '20px',
+    }).setOrigin(0.5).setDepth(5);
+
+    // Bob animation
+    this.tweens.add({
+      targets: [gfx, rim, lbl], y: y - 10,
+      duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+    // Pulse glow
+    this.tweens.add({
+      targets: rim, alpha: 0.1,
+      duration: 500, yoyo: true, repeat: -1,
+    });
+
+    this._powerUps.push({ type: t.type, label: t.label, x, y, gfx, rim, lbl, active: true });
+  }
+
+  _checkPowerUpCollisions() {
+    for (const pu of this._powerUps) {
+      if (!pu.active) continue;
+      for (const fighter of [this.fighter1, this.fighter2]) {
+        if (!fighter.isAlive) continue;
+        const dx = Math.abs(fighter.x - pu.x);
+        const dy = Math.abs(fighter.y - pu.y);
+        if (dx < 48 && dy < 60) {
+          this._collectPowerUp(fighter, pu);
+          break;
+        }
+      }
+    }
+    this._powerUps = this._powerUps.filter(p => p.active);
+  }
+
+  _collectPowerUp(fighter, pu) {
+    pu.active = false;
+    pu.gfx.destroy();
+    pu.rim.destroy();
+    pu.lbl.destroy();
+
+    // Flash collect text
+    const txt = this.add.text(fighter.x, fighter.y - 70, pu.label, {
+      fontSize: '22px', fontFamily: 'Arial Black, Arial',
+      fill: '#FFD700', stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(65);
+    this.tweens.add({
+      targets: txt, y: txt.y - 45, alpha: 0,
+      duration: 900, ease: 'Power2',
+      onComplete: () => txt.destroy(),
+    });
+
+    switch (pu.type) {
+      case 'heal': {
+        fighter.hp = Math.min(fighter.maxHp, fighter.hp + 25);
+        const smooth = fighter === this.fighter1 ? this._p1Smooth : this._p2Smooth;
+        this.tweens.killTweensOf(smooth);
+        this.tweens.add({ targets: smooth, hp: fighter.hp, duration: 280 });
+        break;
+      }
+      case 'damage': {
+        fighter._damageMult = 2.0;
+        fighter._visual.setTint(0xff8800);
+        this.time.delayedCall(6000, () => {
+          fighter._damageMult = 1;
+          if (fighter._visual) fighter._visual.clearTint();
+        });
+        break;
+      }
+      case 'speed': {
+        const orig = fighter.config.moveSpeed;
+        fighter.config.moveSpeed = Math.round(orig * 1.6);
+        fighter._visual.setTint(0xffee44);
+        this.time.delayedCall(6000, () => {
+          fighter.config.moveSpeed = orig;
+          if (fighter._visual) fighter._visual.clearTint();
+        });
+        break;
+      }
+    }
   }
 }

@@ -134,8 +134,7 @@ class GameOverScene extends Phaser.Scene {
     btnBg.on('pointerout',   () => { btnBg.setFillStyle(0xFF6347); btnText.setScale(1); });
     btnBg.on('pointerdown',  () => { this.scene.start('MenuScene'); });
 
-    this.input.keyboard.once('keydown-SPACE', () => { this.scene.start('MenuScene'); });
-    this.input.keyboard.once('keydown-ENTER', () => { this.scene.start('MenuScene'); });
+    // Touch-only — no keyboard listeners
 
     this.tweens.add({
       targets: [btnBg, btnText],
@@ -144,7 +143,7 @@ class GameOverScene extends Phaser.Scene {
     });
 
     // Press any key hint
-    this.add.text(W / 2, H - 38, 'Press SPACE / ENTER or click to continue', {
+    this.add.text(W / 2, H - 38, 'Tap PLAY AGAIN to continue', {
       fontSize: '13px', fontFamily: 'Arial',
       fill: '#777777'
     }).setOrigin(0.5).setDepth(10);
