@@ -15,6 +15,8 @@ const GIANT_TACO_CONFIG = {
   lightCooldown:  350,
   heavyCooldown:  1000,
 
+  victoryTextureKey: 'gt_idle', // shown on the Game Over screen when boss wins
+
   textures: {
     IDLE:         'gt_idle',
     WALK:         'gt_walk',

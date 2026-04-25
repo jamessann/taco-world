@@ -41,6 +41,7 @@ class FightScene extends Phaser.Scene {
     this._setupHUD();
     this._setupTouchControls();
     this._setupPowerUps();
+    if (this.isBossRound) this._setupBossProjectiles();
     this._startRoundCountdown();
   }
 
@@ -296,6 +297,9 @@ class FightScene extends Phaser.Scene {
 
     // Power-ups
     this._updatePowerUps(delta);
+
+    // Boss projectiles (boss round only)
+    if (this.isBossRound) this._updateBossProjectiles(delta);
 
     // Round timer
     this._timerAccum += delta;
@@ -554,30 +558,34 @@ class FightScene extends Phaser.Scene {
   _spawnPowerUp() {
     const W = this.scale.width;
     const types = [
-      { type: 'heal',   emoji: '❤️',  color: 0xff4488, label: '+25 HP'       },
-      { type: 'damage', emoji: '💥',  color: 0xff6600, label: 'POWER UP!'    },
-      { type: 'speed',  emoji: '⚡',  color: 0xffcc00, label: 'SPEED UP!'    },
+      { type: 'heal',   icon: '+HP',  color: 0xff2255, rimColor: 0xff88bb, label: '+25 HP!'    },
+      { type: 'damage', icon: 'POW',  color: 0xff6600, rimColor: 0xffaa44, label: 'POWER UP!'  },
+      { type: 'speed',  icon: 'SPD',  color: 0xccaa00, rimColor: 0xffee44, label: 'SPEED UP!'  },
     ];
-    const t  = Phaser.Utils.Array.GetRandom(types);
-    const x  = Phaser.Math.Between(180, W - 180);
-    const y  = FLOOR_Y - 28;
+    const t = Phaser.Utils.Array.GetRandom(types);
+    const x = Phaser.Math.Between(180, W - 180);
+    const y = FLOOR_Y - 32;
 
-    // Glowing circle
-    const gfx = this.add.circle(x, y, 24, t.color, 0.88).setDepth(4);
-    const rim = this.add.circle(x, y, 27, 0xffffff, 0.4).setDepth(3);
-    const lbl = this.add.text(x, y, t.emoji, {
-      fontSize: '20px',
-    }).setOrigin(0.5).setDepth(5);
+    // Outer pulse ring
+    const rim = this.add.circle(x, y, 30, t.rimColor, 0.35).setDepth(8);
+    // Main glowing circle
+    const gfx = this.add.circle(x, y, 24, t.color, 1).setDepth(9);
+    // Text label — short caps, always renders on Safari canvas
+    const lbl = this.add.text(x, y, t.icon, {
+      fontSize: '13px', fontFamily: 'Arial Black, Arial',
+      fill: '#ffffff', stroke: '#000000', strokeThickness: 3,
+      align: 'center',
+    }).setOrigin(0.5).setDepth(10);
 
-    // Bob animation
+    // Bob up/down
     this.tweens.add({
-      targets: [gfx, rim, lbl], y: y - 10,
-      duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      targets: [rim, gfx, lbl], y: y - 12,
+      duration: 650, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     });
-    // Pulse glow
+    // Pulse glow on rim
     this.tweens.add({
-      targets: rim, alpha: 0.1,
-      duration: 500, yoyo: true, repeat: -1,
+      targets: rim, alpha: 0.05, scaleX: 1.35, scaleY: 1.35,
+      duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     });
 
     this._powerUps.push({ type: t.type, label: t.label, x, y, gfx, rim, lbl, active: true });
@@ -590,7 +598,7 @@ class FightScene extends Phaser.Scene {
         if (!fighter.isAlive) continue;
         const dx = Math.abs(fighter.x - pu.x);
         const dy = Math.abs(fighter.y - pu.y);
-        if (dx < 48 && dy < 60) {
+        if (dx < 65 && dy < 70) {
           this._collectPowerUp(fighter, pu);
           break;
         }
@@ -644,5 +652,149 @@ class FightScene extends Phaser.Scene {
         break;
       }
     }
+  }
+
+  // ─── Boss Projectiles ─────────────────────────────────────────────────────────
+
+  _setupBossProjectiles() {
+    this._bossProjectiles = [];
+    this._bossShootTimer  = 0;
+
+    // First shot is a little later so player has time to settle
+    const intervals = {
+      easy:   { min: 5500, max: 8000, first: 7000 },
+      medium: { min: 3500, max: 5500, first: 5000 },
+      hard:   { min: 2000, max: 3500, first: 3500 },
+    };
+    const iv = intervals[this.difficulty] || intervals.medium;
+    this._bossShootMin      = iv.min;
+    this._bossShootMax      = iv.max;
+    this._bossShootInterval = iv.first;   // first interval is always a bit longer
+  }
+
+  _updateBossProjectiles(delta) {
+    // ── Firing timer ──────────────────────────────────────────────────────────
+    if (this.fighter2 && this.fighter2.isAlive &&
+        this.fighter2.state !== STATES.KO &&
+        this.fighter2.state !== STATES.HIT) {
+      this._bossShootTimer += delta;
+      if (this._bossShootTimer >= this._bossShootInterval) {
+        this._bossShootTimer  = 0;
+        this._bossShootInterval = Phaser.Math.Between(this._bossShootMin, this._bossShootMax);
+        this._fireBossProjectile();
+      }
+    }
+
+    // ── Move + collide ────────────────────────────────────────────────────────
+    const W = this.scale.width;
+    for (let i = this._bossProjectiles.length - 1; i >= 0; i--) {
+      const p = this._bossProjectiles[i];
+
+      // Advance position
+      p.x     += p.vx * (delta / 1000);
+      p.angle += 360  * (delta / 1000);    // full spin per second
+      p.gfx.setPosition(p.x, p.y);
+      p.gfx.setAngle(p.angle);
+      p.lbl.setPosition(p.x, p.y);
+
+      // Off-screen → remove
+      if (p.x < -60 || p.x > W + 60) {
+        p.gfx.destroy();
+        p.lbl.destroy();
+        this._bossProjectiles.splice(i, 1);
+        continue;
+      }
+
+      // Collision with human fighter (fighter1)
+      const f = this.fighter1;
+      if (!f || !f.isAlive) continue;
+
+      const dx = Math.abs(f.x - p.x);
+      const dy = Math.abs(f.y - p.y);
+
+      // Dodged if jumping or blocking/ducking
+      const isJumping = !f.isOnGround();
+      const isDucking = f.state === STATES.BLOCK;
+      if (isJumping || isDucking) continue;
+
+      if (dx < 55 && dy < 65) {
+        // Hit!
+        p.gfx.destroy();
+        p.lbl.destroy();
+        this._bossProjectiles.splice(i, 1);
+
+        const kbDir = p.vx > 0 ? 1 : -1;
+        const dmg = f.takeDamage(p.damage, kbDir);
+        this.tweens.killTweensOf(this._p1Smooth);
+        this.tweens.add({ targets: this._p1Smooth, hp: f.hp, duration: 280, ease: 'Power2' });
+        this._spawnHitText(f.x, f.y - f.config.height / 2, dmg, false);
+        this.cameras.main.shake(100, 0.006);
+
+        // Mini "TACO HIT" label
+        const hitLbl = this.add.text(f.x, f.y - 90, 'TACO HIT!', {
+          fontSize: '16px', fontFamily: 'Arial Black, Arial',
+          fill: '#FF6347', stroke: '#000', strokeThickness: 3,
+        }).setOrigin(0.5).setDepth(65);
+        this.tweens.add({
+          targets: hitLbl, y: hitLbl.y - 30, alpha: 0,
+          duration: 700, ease: 'Power2', onComplete: () => hitLbl.destroy(),
+        });
+      }
+    }
+  }
+
+  _fireBossProjectile() {
+    const boss = this.fighter2;
+    if (!boss || !boss.isAlive) return;
+
+    const f    = this.fighter1;
+    const dirX = (f && f.x < boss.x) ? -1 : 1;   // fire toward the human
+    const speed  = 400;
+    const projY  = FLOOR_Y - 75;                  // mid-body of a standing fighter
+    const startX = boss.x + dirX * (boss.config.width / 2 + 15);
+
+    // Spinning taco shell (circle + label)
+    const gfx = this.add.circle(startX, projY, 20, 0xFF6347, 1)
+      .setStrokeStyle(3, 0xFFD700)
+      .setDepth(14);
+    // "🌮" text — rendered on top of the circle as a fallback label
+    const lbl = this.add.text(startX, projY, '🌮', {
+      fontSize: '18px',
+    }).setOrigin(0.5).setDepth(15);
+
+    // Warning banner: flashes above the arena
+    const W    = this.scale.width;
+    const side = dirX < 0 ? '← MINI TACO!' : 'MINI TACO! →';
+    const warn = this.add.text(W / 2, 108, side, {
+      fontSize: '20px', fontFamily: 'Arial Black, Arial',
+      fill: '#FF6347', stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(50).setAlpha(0);
+    this.tweens.add({
+      targets: warn, alpha: 1, duration: 110,
+      yoyo: true, repeat: 2,
+      onComplete: () => warn.destroy(),
+    });
+
+    // Instruction tip (only show the first 3 times)
+    this._tacoHintCount = (this._tacoHintCount || 0) + 1;
+    if (this._tacoHintCount <= 3) {
+      const tip = this.add.text(W / 2, 130, 'Jump or Block to dodge!', {
+        fontSize: '13px', fontFamily: 'Arial',
+        fill: '#ffffff', stroke: '#000', strokeThickness: 2,
+      }).setOrigin(0.5).setDepth(50).setAlpha(0);
+      this.tweens.add({
+        targets: tip, alpha: 1, duration: 200, delay: 150,
+        hold: 1200, yoyo: true,
+        onComplete: () => tip.destroy(),
+      });
+    }
+
+    this._bossProjectiles.push({
+      x: startX, y: projY,
+      vx: dirX * speed,
+      angle: 0,
+      damage: 12,   // less than the boss's direct light hit (lightDamage=12 at base; this ignores difficulty scaling intentionally)
+      gfx, lbl,
+    });
   }
 }
