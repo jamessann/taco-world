@@ -53,6 +53,15 @@ class GiantTaco extends Fighter {
 
     const dist = Math.abs(this.x - target.x);
 
+    // Retreat if player is spam-attacking — dash/jump away to reset spacing
+    if (this._hitStreak >= 3 && dist < CPU_ENGAGE_DISTANCE + 40) {
+      this._hitStreak = 0;
+      const retreatDir = this.x > target.x ? 1 : -1;
+      this.physBody.setVelocityX(retreatDir * this.config.moveSpeed * 1.8);
+      if (this.isOnGround()) this.jump();
+      return;
+    }
+
     // Move toward target until in range
     if (dist > CPU_ENGAGE_DISTANCE) {
       if (target.x < this.x) this.moveLeft();

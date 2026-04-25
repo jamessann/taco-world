@@ -148,6 +148,18 @@ class FightScene extends Phaser.Scene {
       fill: '#ffffff', stroke: '#000000', strokeThickness: 5
     }).setOrigin(0.5, 0).setDepth(DEPTH + 3);
 
+    // ── Stamina bars (below health bars) ─────────────────────────────────────
+    const STA_Y = BAR_Y + 16;
+    const STA_H = 7;
+    // P1 stamina
+    this.add.rectangle(P1_BAR_X + BAR_W / 2, STA_Y, BAR_W + 4, STA_H + 4, 0x222222).setDepth(DEPTH);
+    this._p1StaFill = this.add.rectangle(P1_BAR_X, STA_Y, BAR_W, STA_H, 0xf1c40f)
+      .setOrigin(0, 0.5).setDepth(DEPTH + 2);
+    // P2 stamina
+    this.add.rectangle(P2_BAR_RX - BAR_W / 2, STA_Y, BAR_W + 4, STA_H + 4, 0x222222).setDepth(DEPTH);
+    this._p2StaFill = this.add.rectangle(P2_BAR_RX, STA_Y, BAR_W, STA_H, 0xf1c40f)
+      .setOrigin(1, 0.5).setDepth(DEPTH + 2);
+
     // ── Round pips ──
     this._pipGraphics = this.add.graphics().setDepth(DEPTH + 3);
     this._drawPips();
@@ -330,13 +342,18 @@ class FightScene extends Phaser.Scene {
     // Landed!
     attacker.attackHitLanded = true;
 
-    const isHeavy  = attacker.state === STATES.ATTACK_HEAVY;
-    const baseDmg  = isHeavy ? attacker.config.heavyDamage : attacker.config.lightDamage;
-    const kbDir    = attacker.facingRight ? 1 : -1;
-    const finalDmg = Math.ceil(baseDmg * (attacker._damageMult || 1));
-    const dmg      = defender.takeDamage(finalDmg, kbDir);
+    const isHeavy = attacker.state === STATES.ATTACK_HEAVY;
+    const baseDmg = isHeavy ? attacker.config.heavyDamage : attacker.config.lightDamage;
+    const kbDir   = attacker.facingRight ? 1 : -1;
 
-    // Tween the plain HP POJO — kill any in-flight tween first so they don't fight each other
+    // Apply damage multipliers: power-up boost × counter boost
+    const isCounter   = attacker._counterBoost > 1;
+    const finalDmg    = Math.ceil(baseDmg * (attacker._damageMult || 1) * (attacker._counterBoost || 1));
+    if (isCounter) { attacker._counterBoost = 1; attacker._counterTimer = 0; }
+
+    const dmg = defender.takeDamage(finalDmg, kbDir);
+
+    // Tween smooth HP bars
     if (defender === this.fighter1) {
       this.tweens.killTweensOf(this._p1Smooth);
       this.tweens.add({ targets: this._p1Smooth, hp: this.fighter1.hp, duration: 280, ease: 'Power2' });
@@ -345,28 +362,50 @@ class FightScene extends Phaser.Scene {
       this.tweens.add({ targets: this._p2Smooth, hp: this.fighter2.hp, duration: 280, ease: 'Power2' });
     }
 
+    // ── Attacker recoil — pushed back when hit lands (breaks close-range camping) ──
+    attacker.physBody.setVelocityX(-kbDir * 160);
+
+    // ── Grant defender a counter boost if they were mid-swing when struck ────
+    if ((defender.state === STATES.ATTACK_LIGHT || defender.state === STATES.ATTACK_HEAVY)
+        && !(defender._counterBoost > 1)) {
+      defender._counterBoost = 1.9;
+      defender._counterTimer = 4000;
+    }
+
+    // ── Track hit streak on defender (used by CPU retreat logic) ─────────────
+    defender._hitStreak      = (defender._hitStreak || 0) + 1;
+    defender._hitStreakTimer = 2500;
+
     // Screen shake on heavy
     if (isHeavy && !defender.isBlocking) {
       this.cameras.main.shake(220, 0.012);
     }
 
-    // Hit spark text
-    this._spawnHitText(defender.x, defender.y - defender.config.height / 2, dmg, isHeavy);
+    // Hit spark text (counter gets special display)
+    this._spawnHitText(defender.x, defender.y - defender.config.height / 2, dmg, isHeavy, isCounter);
   }
 
-  _spawnHitText(x, y, dmg, isHeavy) {
-    const style = isHeavy
-      ? { fontSize: '28px', fill: '#FFD700', stroke: '#8B0000', strokeThickness: 5 }
-      : { fontSize: '18px', fill: '#ffffff', stroke: '#333333', strokeThickness: 3 };
+  _spawnHitText(x, y, dmg, isHeavy, isCounter = false) {
+    let label, style;
+    if (isCounter) {
+      label = `COUNTER! -${dmg}`;
+      style = { fontSize: '26px', fill: '#ff2200', stroke: '#FFD700', strokeThickness: 6 };
+    } else if (isHeavy) {
+      label = `-${dmg}`;
+      style = { fontSize: '28px', fill: '#FFD700', stroke: '#8B0000', strokeThickness: 5 };
+    } else {
+      label = `-${dmg}`;
+      style = { fontSize: '18px', fill: '#ffffff', stroke: '#333333', strokeThickness: 3 };
+    }
 
-    const txt = this.add.text(x, y, `-${dmg}`, { ...style, fontFamily: 'Arial Black, Arial' })
+    const txt = this.add.text(x, y, label, { ...style, fontFamily: 'Arial Black, Arial' })
       .setOrigin(0.5, 1).setDepth(60);
 
     this.tweens.add({
       targets: txt,
-      y: y - 55,
+      y: y - (isCounter ? 70 : 55),
       alpha: 0,
-      duration: isHeavy ? 900 : 600,
+      duration: isCounter ? 1100 : isHeavy ? 900 : 600,
       ease: 'Power2',
       onComplete: () => txt.destroy()
     });
@@ -384,6 +423,14 @@ class FightScene extends Phaser.Scene {
     // Colour shift green → yellow → red
     this._p1BarFill.fillColor = this._hpColor(p1Pct);
     this._p2BarFill.fillColor = this._hpColor(p2Pct);
+
+    // ── Stamina bars ─────────────────────────────────────────────────────────
+    const p1Sta = Math.max(0, this.fighter1.stamina / this.fighter1.maxStamina);
+    const p2Sta = Math.max(0, this.fighter2.stamina / this.fighter2.maxStamina);
+    this._p1StaFill.scaleX = p1Sta;
+    this._p2StaFill.scaleX = p2Sta;
+    this._p1StaFill.fillColor = this.fighter1._exhausted ? 0xe74c3c : (p1Sta > 0.35 ? 0xf1c40f : 0xe67e22);
+    this._p2StaFill.fillColor = this.fighter2._exhausted ? 0xe74c3c : (p2Sta > 0.35 ? 0xf1c40f : 0xe67e22);
   }
 
   _hpColor(pct) {

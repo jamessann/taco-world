@@ -24,6 +24,20 @@ class Fighter {
     this.isAlive     = true;
     this.cooldowns   = { light: 0, heavy: 0, hit: 0 };
 
+    // ── Stamina (anti-mash) ───────────────────────────────────────────────────
+    this.stamina        = 100;
+    this.maxStamina     = 100;
+    this._exhausted     = false;   // true while stamina penalty is active
+    this._exhaustedTimer = 0;      // ms remaining
+
+    // ── Counter window ────────────────────────────────────────────────────────
+    this._counterBoost = 1;        // damage multiplier for next attack
+    this._counterTimer = 0;        // ms until counter boost expires
+
+    // ── Hit-streak (for CPU retreat) ──────────────────────────────────────────
+    this._hitStreak      = 0;
+    this._hitStreakTimer = 0;
+
     // ── Physics rectangle ────────────────────────────────────────────────────
     // Always present — drives all physics. Hidden when a sprite overlay is used.
     this.rect = scene.add.rectangle(x, y, config.width, config.height, config.color);
@@ -175,6 +189,10 @@ class Fighter {
 
   lightAttack() {
     if (!this.canAttack() || this.cooldowns.light > 0) return;
+    // Stamina cost — exhaustion if empty
+    const lightCost = 20;
+    if (this.stamina < lightCost) { this._triggerExhaustion(); return; }
+    this.stamina -= lightCost;
     this.state = STATES.ATTACK_LIGHT;
     this.hitboxActive    = true;
     this.attackHitLanded = false;
@@ -193,6 +211,10 @@ class Fighter {
 
   heavyAttack() {
     if (!this.canAttack() || this.cooldowns.heavy > 0) return;
+    // Stamina cost
+    const heavyCost = 35;
+    if (this.stamina < heavyCost) { this._triggerExhaustion(); return; }
+    this.stamina -= heavyCost;
     this.state = STATES.ATTACK_HEAVY;
     this.hitboxActive    = true;
     this.attackHitLanded = false;
@@ -252,6 +274,24 @@ class Fighter {
     return dmg;
   }
 
+  _triggerExhaustion() {
+    if (this._exhausted) return;
+    this._exhausted      = true;
+    this._exhaustedTimer = 2000;
+    this.stamina         = 0;
+
+    // Visual pop-up
+    const tx = this.scene.add.text(this.x, this.y - this._dH / 2 - 10, 'EXHAUSTED!', {
+      fontSize: '18px', fontFamily: 'Arial Black, Arial',
+      fill: '#ff8800', stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5, 1).setDepth(70);
+    this.scene.tweens.add({
+      targets: tx, y: tx.y - 50, alpha: 0,
+      duration: 1300, ease: 'Power2',
+      onComplete: () => tx.destroy(),
+    });
+  }
+
   _triggerKO() {
     this.isAlive      = false;
     this.isBlocking   = false;
@@ -301,6 +341,7 @@ class Fighter {
 
   canAttack() {
     return this.isAlive &&
+      !this._exhausted &&
       this.state !== STATES.KO &&
       this.state !== STATES.HIT &&
       this.state !== STATES.BLOCK;
@@ -321,6 +362,15 @@ class Fighter {
 
     const engageDist = this.config.cpuEngageDistance || 120;
     const dist = Math.abs(this.x - target.x);
+
+    // Retreat if player is spam-attacking (hit-streak protection)
+    if (this._hitStreak >= 3 && dist < engageDist + 40) {
+      this._hitStreak = 0;
+      const retreatDir = this.x > target.x ? 1 : -1;
+      this.physBody.setVelocityX(retreatDir * this.config.moveSpeed * 1.6);
+      if (this.isOnGround() && Math.random() < 0.65) this.jump();
+      return;
+    }
 
     // Move toward target until within engage range
     if (dist > engageDist) {
@@ -351,6 +401,33 @@ class Fighter {
     this.cooldowns.heavy = Math.max(0, this.cooldowns.heavy - delta);
     this.cooldowns.hit   = Math.max(0, this.cooldowns.hit   - delta);
 
+    // ── Stamina regen (only while not actively swinging) ──────────────────────
+    if (this.state !== STATES.ATTACK_LIGHT && this.state !== STATES.ATTACK_HEAVY) {
+      this.stamina = Math.min(this.maxStamina, this.stamina + 24 * (delta / 1000));
+    }
+
+    // ── Exhaustion countdown ──────────────────────────────────────────────────
+    if (this._exhausted) {
+      this._exhaustedTimer -= delta;
+      if (this._exhaustedTimer <= 0) {
+        this._exhausted      = false;
+        this._exhaustedTimer = 0;
+        this.stamina         = 18; // just enough for one light attack after recovery
+      }
+    }
+
+    // ── Counter boost expiry ──────────────────────────────────────────────────
+    if (this._counterTimer > 0) {
+      this._counterTimer -= delta;
+      if (this._counterTimer <= 0) { this._counterBoost = 1; this._counterTimer = 0; }
+    }
+
+    // ── Hit streak decay (resets if not hit again within 2.5 s) ──────────────
+    if (this._hitStreakTimer > 0) {
+      this._hitStreakTimer -= delta;
+      if (this._hitStreakTimer <= 0) { this._hitStreak = 0; this._hitStreakTimer = 0; }
+    }
+
     if (this.isOnGround() && this.state === STATES.JUMP) this.state = STATES.IDLE;
 
     // Sync sprite texture / position / flip
@@ -378,7 +455,14 @@ class Fighter {
     this.state       = STATES.IDLE;
     this.hitboxActive    = false;
     this.attackHitLanded = false;
-    this.cooldowns   = { light: 0, heavy: 0, hit: 0 };
+    this.cooldowns       = { light: 0, heavy: 0, hit: 0 };
+    this.stamina         = this.maxStamina;
+    this._exhausted      = false;
+    this._exhaustedTimer = 0;
+    this._counterBoost   = 1;
+    this._counterTimer   = 0;
+    this._hitStreak      = 0;
+    this._hitStreakTimer = 0;
 
     this.rect.setPosition(x, y);
     this.rect.setAngle(0);
