@@ -190,7 +190,7 @@ class Fighter {
   lightAttack() {
     if (!this.canAttack() || this.cooldowns.light > 0) return;
     // Stamina cost — exhaustion if empty
-    const lightCost = 20;
+    const lightCost = 15;
     if (this.stamina < lightCost) { this._triggerExhaustion(); return; }
     this.stamina -= lightCost;
     this.state = STATES.ATTACK_LIGHT;
@@ -212,7 +212,7 @@ class Fighter {
   heavyAttack() {
     if (!this.canAttack() || this.cooldowns.heavy > 0) return;
     // Stamina cost
-    const heavyCost = 35;
+    const heavyCost = 28;
     if (this.stamina < heavyCost) { this._triggerExhaustion(); return; }
     this.stamina -= heavyCost;
     this.state = STATES.ATTACK_HEAVY;
@@ -277,7 +277,7 @@ class Fighter {
   _triggerExhaustion() {
     if (this._exhausted) return;
     this._exhausted      = true;
-    this._exhaustedTimer = 2000;
+    this._exhaustedTimer = 1500;
     this.stamina         = 0;
 
     // Visual pop-up
@@ -403,7 +403,7 @@ class Fighter {
 
     // ── Stamina regen (only while not actively swinging) ──────────────────────
     if (this.state !== STATES.ATTACK_LIGHT && this.state !== STATES.ATTACK_HEAVY) {
-      this.stamina = Math.min(this.maxStamina, this.stamina + 24 * (delta / 1000));
+      this.stamina = Math.min(this.maxStamina, this.stamina + 30 * (delta / 1000));
     }
 
     // ── Exhaustion countdown ──────────────────────────────────────────────────
@@ -412,7 +412,7 @@ class Fighter {
       if (this._exhaustedTimer <= 0) {
         this._exhausted      = false;
         this._exhaustedTimer = 0;
-        this.stamina         = 18; // just enough for one light attack after recovery
+        this.stamina         = 25; // enough for a couple of attacks after recovery
       }
     }
 

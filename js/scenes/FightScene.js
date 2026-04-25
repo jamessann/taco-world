@@ -21,11 +21,12 @@ class FightScene extends Phaser.Scene {
     this.roundNumber    = data.roundNumber    || 1;
     this.p1Wins         = data.p1Wins         || 0;
     this.p2Wins         = data.p2Wins         || 0;
-    this.isBossRound    = data.isBossRound    || false;
-    this.isTiebreaker   = data.isTiebreaker   || false;
-    this.bossChallenger = data.bossChallenger || 'P1'; // 'P1' or 'P2'
+    this.isBossRound      = data.isBossRound      || false;
+    this.isSuperBossRound = data.isSuperBossRound  || false;
+    this.isTiebreaker     = data.isTiebreaker      || false;
+    this.bossChallenger   = data.bossChallenger    || 'P1'; // 'P1' or 'P2'
     // P2 is CPU when it's the boss round (Giant Taco) OR 1P mode (Taco Girl as CPU)
-    this.isP2CPU        = this.isBossRound || this.mode === '1P';
+    this.isP2CPU          = this.isBossRound || this.mode === '1P';
     this.difficulty     = data.difficulty  || 'medium';
     this.gameState      = 'COUNTDOWN';
     this.roundTimeLeft  = ROUND_TIME;
@@ -42,6 +43,7 @@ class FightScene extends Phaser.Scene {
     this._setupTouchControls();
     this._setupPowerUps();
     if (this.isBossRound) this._setupBossProjectiles();
+    if (this.isSuperBossRound) this._setupSuperBossAbilities();
     this._startRoundCountdown();
   }
 
@@ -74,6 +76,28 @@ class FightScene extends Phaser.Scene {
         ? new TacoGirl(this, 200, spawnY)
         : new TacoBoy(this, 200, spawnY);
       this.fighter2 = new GiantTaco(this, W - 220, FLOOR_Y - 80);
+
+      // Super Taco Boss: scale up the existing GiantTaco instance
+      if (this.isSuperBossRound) {
+        const c = this.fighter2.config;
+        c.maxHp          = 240;
+        c.moveSpeed      = 220;
+        c.knockbackSpeed = 110;
+        c.lightDamage    = 20;
+        c.heavyDamage    = 45;
+        this.fighter2.hp    = c.maxHp;
+        this.fighter2.maxHp = c.maxHp;
+        // Scale sprite up by 1.35×
+        const scale = 1.35;
+        this.fighter2._spriteBaseScaleX *= scale;
+        this.fighter2._spriteBaseScaleY *= scale;
+        if (this.fighter2.sprite) {
+          this.fighter2.sprite.setScale(
+            this.fighter2._spriteBaseScaleX,
+            this.fighter2._spriteBaseScaleY
+          );
+        }
+      }
     } else {
       // Normal round: TacoBoy left, TacoGirl right
       this.fighter1 = new TacoBoy(this, 200, spawnY);
@@ -101,9 +125,9 @@ class FightScene extends Phaser.Scene {
   // Returns CPU difficulty overrides based on this.difficulty
   _cpuDifficultyConfig() {
     const presets = {
-      easy:   { damageMult: 1.0,  intervalMin: 1200, intervalMax: 2200, engageDist: 120 },
-      medium: { damageMult: 1.4,  intervalMin: 380,  intervalMax: 850,  engageDist: 90  },
-      hard:   { damageMult: 1.9,  intervalMin: 140,  intervalMax: 340,  engageDist: 65  },
+      easy:   { damageMult: 0.7,  intervalMin: 2000, intervalMax: 3500, engageDist: 140 },
+      medium: { damageMult: 1.0,  intervalMin: 900,  intervalMax: 1800, engageDist: 110 },
+      hard:   { damageMult: 1.45, intervalMin: 350,  intervalMax: 700,  engageDist: 80  },
     };
     return presets[this.difficulty] || presets.medium;
   }
@@ -203,7 +227,10 @@ class FightScene extends Phaser.Scene {
     const W = this.scale.width;
     const H = this.scale.height;
     let roundLabel, subLabel;
-    if (this.isBossRound) {
+    if (this.isSuperBossRound) {
+      roundLabel = 'SUPER TACO BOSS!!';
+      subLabel   = 'He\'s angrier. He\'s bigger. Good luck.';
+    } else if (this.isBossRound) {
       roundLabel = 'BOSS ROUND!';
       subLabel   = 'Survive the Giant Taco!';
     } else if (this.isTiebreaker) {
@@ -313,6 +340,9 @@ class FightScene extends Phaser.Scene {
     // Boss projectiles (boss round only)
     if (this.isBossRound) this._updateBossProjectiles(delta);
 
+    // Super Taco Boss special abilities
+    if (this.isSuperBossRound) this._updateSuperBossAbilities(delta);
+
     // Round timer
     this._timerAccum += delta;
     if (this._timerAccum >= 1000) {
@@ -346,10 +376,20 @@ class FightScene extends Phaser.Scene {
     const baseDmg = isHeavy ? attacker.config.heavyDamage : attacker.config.lightDamage;
     const kbDir   = attacker.facingRight ? 1 : -1;
 
-    // Apply damage multipliers: power-up boost × counter boost
+    // Apply damage multipliers: power-up boost × counter boost × shield reduction
     const isCounter   = attacker._counterBoost > 1;
-    const finalDmg    = Math.ceil(baseDmg * (attacker._damageMult || 1) * (attacker._counterBoost || 1));
+    const shieldMult  = defender._shieldActive ? 0.08 : 1;
+    const finalDmg    = Math.ceil(baseDmg * (attacker._damageMult || 1) * (attacker._counterBoost || 1) * shieldMult);
     if (isCounter) { attacker._counterBoost = 1; attacker._counterTimer = 0; }
+
+    // Visual feedback when shield absorbs a hit
+    if (defender._shieldActive) {
+      const absLbl = this.add.text(defender.x, defender.y - defender.config.height / 2 - 10, 'ABSORBED!', {
+        fontSize: '16px', fontFamily: 'Arial Black, Arial',
+        fill: '#00ffff', stroke: '#000000', strokeThickness: 3,
+      }).setOrigin(0.5, 1).setDepth(65);
+      this.tweens.add({ targets: absLbl, y: absLbl.y - 40, alpha: 0, duration: 700, ease: 'Power2', onComplete: () => absLbl.destroy() });
+    }
 
     const dmg = defender.takeDamage(finalDmg, kbDir);
 
@@ -493,8 +533,18 @@ class FightScene extends Phaser.Scene {
         });
       };
 
-      // ── Boss round — always the final fight ──────────────────────────────
+      // ── Boss round ───────────────────────────────────────────────────────
       if (this.isBossRound) {
+        // If player wins the regular boss TOO FAST (< 40 s fight time), awaken the Super Taco Boss
+        if (winnerId === 1 && !this.isSuperBossRound && this.roundTimeLeft > 58) {
+          this.scene.start('FightScene', {
+            mode: this.mode, difficulty: this.difficulty,
+            p1Wins: this.p1Wins, p2Wins: this.p2Wins,
+            isBossRound: true, bossChallenger: this.bossChallenger,
+            isSuperBossRound: true,
+          });
+          return;
+        }
         _goGameOver(winnerId);
         return;
       }
@@ -709,9 +759,9 @@ class FightScene extends Phaser.Scene {
 
     // First shot is a little later so player has time to settle
     const intervals = {
-      easy:   { min: 3500, max: 5500, first: 5000 },
-      medium: { min: 2000, max: 3500, first: 3500 },
-      hard:   { min: 800,  max: 1800, first: 2500 },
+      easy:   { min: 5000, max: 7500, first: 7000 },
+      medium: { min: 3000, max: 5000, first: 4500 },
+      hard:   { min: 1600, max: 3000, first: 3500 },
     };
     const iv = intervals[this.difficulty] || intervals.medium;
     this._bossShootMin      = iv.min;
@@ -843,5 +893,195 @@ class FightScene extends Phaser.Scene {
       damage: 12,   // less than the boss's direct light hit (lightDamage=12 at base; this ignores difficulty scaling intentionally)
       gfx, lbl,
     });
+  }
+
+  // ─── Super Taco Boss Special Abilities ───────────────────────────────────────
+
+  _setupSuperBossAbilities() {
+    // Ground stomp
+    this._stompShockwaves    = [];
+    this._bossStompTimer     = Phaser.Math.Between(8000, 12000); // first stomp
+    this._bossJumpedForStomp = false;
+    this._bossWasAirborne    = false;
+
+    // Taco barrier (shield)
+    this._bossShieldTimer    = 18000;
+    this._bossShieldActive   = false;
+    this._bossShieldDuration = 0;
+    this._bossShieldObj      = null;
+
+    // Enrage
+    this._bossEnraged        = false;
+
+    // Super boss uses faster projectiles — override fire-rate
+    this._bossShootMin      = 1200;
+    this._bossShootMax      = 2500;
+    this._bossShootInterval = 3000;  // first shot after 3 s (give player a moment)
+  }
+
+  _updateSuperBossAbilities(delta) {
+    const boss = this.fighter2;
+    const W    = this.scale.width;
+    const H    = this.scale.height;
+    if (!boss || !boss.isAlive) return;
+
+    // ── Enrage at 50 % HP ────────────────────────────────────────────────────
+    if (!this._bossEnraged && boss.hp < boss.maxHp * 0.5) {
+      this._bossEnraged = true;
+      boss.config.moveSpeed   = Math.round(boss.config.moveSpeed * 1.4);
+      this._bossShootMin      = Math.round(this._bossShootMin * 0.5);
+      this._bossShootMax      = Math.round(this._bossShootMax * 0.5);
+      if (boss._visual) boss._visual.setTint(0xff3300);
+
+      const enrageTxt = this.add.text(W / 2, H / 2, 'ENRAGED!!', {
+        fontSize: '80px', fontFamily: 'Arial Black, Impact, Arial',
+        fill: '#ff0000', stroke: '#FFD700', strokeThickness: 10,
+      }).setOrigin(0.5).setDepth(55).setScale(0.1);
+      this.tweens.add({
+        targets: enrageTxt, scaleX: 1, scaleY: 1, duration: 300, ease: 'Back.easeOut',
+        onComplete: () => {
+          this.time.delayedCall(1400, () => {
+            this.tweens.add({ targets: enrageTxt, alpha: 0, duration: 400, onComplete: () => enrageTxt.destroy() });
+          });
+        },
+      });
+      this.cameras.main.shake(500, 0.018);
+    }
+
+    // ── Ground stomp ─────────────────────────────────────────────────────────
+    this._bossStompTimer -= delta;
+    if (this._bossStompTimer <= 0 && boss.isOnGround() && boss.state !== STATES.KO) {
+      this._bossStompTimer = Phaser.Math.Between(
+        this._bossEnraged ? 6000 : 10000,
+        this._bossEnraged ? 10000 : 17000
+      );
+      this._triggerBossStomp();
+    }
+
+    // Detect landing after stomp jump
+    const nowOnGround = boss.isOnGround();
+    if (this._bossJumpedForStomp && !this._bossWasAirborne && !nowOnGround) {
+      this._bossWasAirborne = true; // confirmed we left the ground
+    }
+    if (this._bossJumpedForStomp && this._bossWasAirborne && nowOnGround) {
+      this._bossJumpedForStomp = false;
+      this._bossWasAirborne    = false;
+      this._fireStompShockwave();
+    }
+
+    // Move shockwaves + check collisions
+    for (let i = this._stompShockwaves.length - 1; i >= 0; i--) {
+      const sw = this._stompShockwaves[i];
+      sw.x += sw.vx * (delta / 1000);
+      sw.obj.setPosition(sw.x, sw.y);
+
+      if (sw.x < -120 || sw.x > W + 120) {
+        sw.obj.destroy();
+        this._stompShockwaves.splice(i, 1);
+        continue;
+      }
+
+      const f = this.fighter1;
+      if (!sw.hitFired && f && f.isAlive && f.isOnGround()) {
+        if (Math.abs(f.x - sw.x) < 65) {
+          sw.hitFired = true;
+          sw.obj.destroy();
+          this._stompShockwaves.splice(i, 1);
+          const dmg = f.takeDamage(22, sw.vx > 0 ? 1 : -1);
+          this.tweens.killTweensOf(this._p1Smooth);
+          this.tweens.add({ targets: this._p1Smooth, hp: f.hp, duration: 280, ease: 'Power2' });
+          this._spawnHitText(f.x, f.y - f.config.height / 2, dmg, true);
+          this.cameras.main.shake(220, 0.014);
+          const stompLbl = this.add.text(f.x, f.y - 95, 'STOMP!', {
+            fontSize: '26px', fontFamily: 'Arial Black, Arial',
+            fill: '#ff4400', stroke: '#000000', strokeThickness: 5,
+          }).setOrigin(0.5).setDepth(65);
+          this.tweens.add({ targets: stompLbl, y: stompLbl.y - 40, alpha: 0, duration: 800, ease: 'Power2', onComplete: () => stompLbl.destroy() });
+          break;
+        }
+      }
+    }
+
+    // ── Taco barrier shield ───────────────────────────────────────────────────
+    if (!this._bossShieldActive) {
+      this._bossShieldTimer -= delta;
+      if (this._bossShieldTimer <= 0) {
+        this._bossShieldTimer = Phaser.Math.Between(20000, 28000);
+        this._activateBossShield();
+      }
+    } else {
+      this._bossShieldDuration -= delta;
+      if (this._bossShieldDuration <= 0) {
+        this._deactivateBossShield();
+      } else if (this._bossShieldObj) {
+        // Shield circle follows boss
+        this._bossShieldObj.setPosition(boss.x, boss.y + boss._spriteYOffset);
+      }
+    }
+  }
+
+  _triggerBossStomp() {
+    const boss = this.fighter2;
+    boss.physBody.setVelocityY(-800);
+    this._bossJumpedForStomp = true;
+    this._bossWasAirborne    = false;
+
+    // Warning shockwave shadow on floor
+    const W    = this.scale.width;
+    const warn = this.add.rectangle(boss.x, FLOOR_Y - 5, 220, 18, 0xff4400, 0.55)
+      .setDepth(11);
+    this.tweens.add({ targets: warn, alpha: 0, duration: 700, onComplete: () => warn.destroy() });
+
+    const warnTxt = this.add.text(W / 2, 108, 'GROUND STOMP! Jump now!', {
+      fontSize: '20px', fontFamily: 'Arial Black, Arial',
+      fill: '#ff4400', stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(50).setAlpha(0);
+    this.tweens.add({ targets: warnTxt, alpha: 1, duration: 110, yoyo: true, repeat: 2, onComplete: () => warnTxt.destroy() });
+  }
+
+  _fireStompShockwave() {
+    const boss = this.fighter2;
+    const dirX = this.fighter1 && this.fighter1.x < boss.x ? -1 : 1;
+
+    this.cameras.main.shake(280, 0.016);
+
+    // Shockwave bar travelling along the floor
+    const swObj = this.add.rectangle(boss.x, FLOOR_Y - 10, 90, 22, 0xff5500, 0.9)
+      .setStrokeStyle(2, 0xff9900)
+      .setDepth(11);
+
+    this._stompShockwaves.push({ x: boss.x, y: FLOOR_Y - 10, vx: dirX * 380, obj: swObj, hitFired: false });
+  }
+
+  _activateBossShield() {
+    this._bossShieldActive   = true;
+    this._bossShieldDuration = 4500;
+    this.fighter2._shieldActive = true;
+
+    const boss = this.fighter2;
+    this._bossShieldObj = this.add.circle(boss.x, boss.y + boss._spriteYOffset, 145, 0x00eeff, 0.22)
+      .setStrokeStyle(3, 0x00eeff)
+      .setDepth(4);
+    this.tweens.add({
+      targets: this._bossShieldObj, alpha: 0.06, scaleX: 1.18, scaleY: 1.18,
+      duration: 350, yoyo: true, repeat: -1,
+    });
+
+    const W    = this.scale.width;
+    const sTxt = this.add.text(W / 2, 108, 'TACO BARRIER ACTIVE!', {
+      fontSize: '20px', fontFamily: 'Arial Black, Arial',
+      fill: '#00eeff', stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(50).setAlpha(0);
+    this.tweens.add({ targets: sTxt, alpha: 1, duration: 180, hold: 1200, yoyo: true, onComplete: () => sTxt.destroy() });
+  }
+
+  _deactivateBossShield() {
+    this._bossShieldActive      = false;
+    this.fighter2._shieldActive = false;
+    if (this._bossShieldObj) {
+      this.tweens.killTweensOf(this._bossShieldObj);
+      this._bossShieldObj.destroy();
+      this._bossShieldObj = null;
+    }
   }
 }
