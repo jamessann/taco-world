@@ -101,9 +101,9 @@ class FightScene extends Phaser.Scene {
   // Returns CPU difficulty overrides based on this.difficulty
   _cpuDifficultyConfig() {
     const presets = {
-      easy:   { damageMult: 0.65, intervalMin: 2400, intervalMax: 4000, engageDist: 160 },
-      medium: { damageMult: 1.0,  intervalMin: 1200, intervalMax: 2200, engageDist: 120 },
-      hard:   { damageMult: 1.4,  intervalMin: 380,  intervalMax: 850,  engageDist: 90  },
+      easy:   { damageMult: 1.0,  intervalMin: 1200, intervalMax: 2200, engageDist: 120 },
+      medium: { damageMult: 1.4,  intervalMin: 380,  intervalMax: 850,  engageDist: 90  },
+      hard:   { damageMult: 1.9,  intervalMin: 140,  intervalMax: 340,  engageDist: 65  },
     };
     return presets[this.difficulty] || presets.medium;
   }
@@ -662,9 +662,9 @@ class FightScene extends Phaser.Scene {
 
     // First shot is a little later so player has time to settle
     const intervals = {
-      easy:   { min: 5500, max: 8000, first: 7000 },
-      medium: { min: 3500, max: 5500, first: 5000 },
-      hard:   { min: 2000, max: 3500, first: 3500 },
+      easy:   { min: 3500, max: 5500, first: 5000 },
+      medium: { min: 2000, max: 3500, first: 3500 },
+      hard:   { min: 800,  max: 1800, first: 2500 },
     };
     const iv = intervals[this.difficulty] || intervals.medium;
     this._bossShootMin      = iv.min;
