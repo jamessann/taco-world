@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>Taco World</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <!-- Characters must load before scenes -->
+  <script src="js/characters/Fighter.js"></script>
+  <script src="js/characters/TacoBoy.js"></script>
+  <script src="js/characters/TacoGirl.js"></script>
+  <script src="js/characters/GiantTaco.js"></script>
+  <!-- UI helpers -->
+  <script src="js/ui/TouchControls.js"></script>
+  <!-- Scenes -->
+  <script src="js/scenes/BootScene.js"></script>
+  <script src="js/scenes/MenuScene.js"></script>
+  <script src="js/scenes/FightScene.js"></script>
+  <script src="js/scenes/GameOverScene.js"></script>
+  <!-- Entry point -->
+  <script src="js/main.js"></script>
+</body>
+</html>
