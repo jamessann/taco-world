@@ -74,6 +74,8 @@ class BootScene extends Phaser.Scene {
     this.load.audio('sfx_powerup',     ['sounds/sfx_powerup.mp3',     'sounds/sfx_powerup.wav']);
     this.load.audio('sfx_bell',        ['sounds/sfx_bell.mp3',        'sounds/sfx_bell.wav']);
     this.load.audio('sfx_crowd_cheer', ['sounds/sfx_crowd_cheer.mp3', 'sounds/sfx_crowd_cheer.wav']);
+    this.load.audio('sfx_boss_grunt',  ['sounds/sfx_boss_grunt.mp3',  'sounds/sfx_boss_grunt.wav']);
+    this.load.audio('sfx_boss_enrage', ['sounds/sfx_boss_enrage.mp3']);
   }
 
   create() {

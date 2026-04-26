@@ -871,6 +871,9 @@ class FightScene extends Phaser.Scene {
     this._bossShootMin      = iv.min;
     this._bossShootMax      = iv.max;
     this._bossShootInterval = iv.first;   // first interval is always a bit longer
+
+    // Occasional boss grunt — random interval between 5 and 11 seconds
+    this._bossGruntTimer = Phaser.Math.Between(5000, 11000);
   }
 
   _updateBossProjectiles(delta) {
@@ -878,11 +881,24 @@ class FightScene extends Phaser.Scene {
     if (this.fighter2 && this.fighter2.isAlive &&
         this.fighter2.state !== STATES.KO &&
         this.fighter2.state !== STATES.HIT) {
+      // ── Projectile fire timer ─────────────────────────────────────────────
       this._bossShootTimer += delta;
       if (this._bossShootTimer >= this._bossShootInterval) {
         this._bossShootTimer  = 0;
         this._bossShootInterval = Phaser.Math.Between(this._bossShootMin, this._bossShootMax);
         this._fireBossProjectile();
+      }
+
+      // ── Occasional grunt ──────────────────────────────────────────────────
+      this._bossGruntTimer -= delta;
+      if (this._bossGruntTimer <= 0) {
+        // Grunt more often when enraged
+        const gruntMin = this._bossEnraged ? 3000 : 5000;
+        const gruntMax = this._bossEnraged ? 6000 : 11000;
+        this._bossGruntTimer = Phaser.Math.Between(gruntMin, gruntMax);
+        if (this.cache.audio.exists('sfx_boss_grunt')) {
+          this.sound.play('sfx_boss_grunt', { volume: 0.65 });
+        }
       }
     }
 
@@ -1034,6 +1050,9 @@ class FightScene extends Phaser.Scene {
     // ── Enrage at 50 % HP ────────────────────────────────────────────────────
     if (!this._bossEnraged && boss.hp < boss.maxHp * 0.5 && this.mode !== 'PRACTICE') {
       this._bossEnraged = true;
+      if (this.cache.audio.exists('sfx_boss_enrage')) {
+        this.sound.play('sfx_boss_enrage', { volume: 0.85 });
+      }
       boss.config.moveSpeed   = Math.round(boss.config.moveSpeed * 1.2);
       this._bossShootMin      = Math.round(this._bossShootMin * 0.5);
       this._bossShootMax      = Math.round(this._bossShootMax * 0.5);
