@@ -34,8 +34,9 @@ class MenuScene extends Phaser.Scene {
     });
 
     // ── Mode buttons ────────────────────────────────────────────────────────
-    this._makeBtn(W / 2 - 155, 235, '1 PLAYER',  0xFF6347, 0xFFD700, () => this._start('1P'));
-    this._makeBtn(W / 2 + 155, 235, '2 PLAYERS', 0x2980b9, 0xFFD700, () => this._start('2P'));
+    this._makeBtn(W / 2 - 155, 228, '1 PLAYER',  0xFF6347, 0xFFD700, () => this._start('1P'));
+    this._makeBtn(W / 2 + 155, 228, '2 PLAYERS', 0x2980b9, 0xFFD700, () => this._start('2P'));
+    this._makePracticeBtn(W / 2, 272);
 
     // ── Flow description ────────────────────────────────────────────────────
     const flowLines = [
@@ -120,6 +121,34 @@ class MenuScene extends Phaser.Scene {
       isBossRound:  false,
       isTiebreaker: false,
     });
+  }
+
+  _makePracticeBtn(x, y) {
+    const bg = this.add.rectangle(x, y, 200, 40, 0x27ae60)
+      .setInteractive({ useHandCursor: true })
+      .setStrokeStyle(3, 0xFFD700)
+      .setDepth(1);
+
+    const txt = this.add.text(x, y, 'PRACTICE', {
+      fontSize: '17px', fontFamily: 'Arial Black, Arial',
+      fill: '#ffffff', stroke: '#000000', strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(2);
+
+    bg.on('pointerover',  () => { bg.setAlpha(0.85); txt.setScale(1.05); });
+    bg.on('pointerout',   () => { bg.setAlpha(1);    txt.setScale(1);    });
+    bg.on('pointerdown',  () => {
+      this.scene.start('FightScene', {
+        mode: 'PRACTICE', difficulty: 'practice',
+        roundNumber: 1, p1Wins: 0, p2Wins: 0,
+        isBossRound: false, isTiebreaker: false,
+      });
+    });
+
+    // Small label underneath
+    this.add.text(x, y + 24, 'Speed boost  •  Weak enemies  •  25 hits', {
+      fontSize: '10px', fontFamily: 'Arial',
+      fill: '#aaffaa', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(2);
   }
 
   _makeBtn(x, y, label, fillColor, strokeColor, onClick) {

@@ -26,7 +26,7 @@ class FightScene extends Phaser.Scene {
     this.isTiebreaker     = data.isTiebreaker      || false;
     this.bossChallenger   = data.bossChallenger    || 'P1'; // 'P1' or 'P2'
     // P2 is CPU when it's the boss round (Giant Taco) OR 1P mode (Taco Girl as CPU)
-    this.isP2CPU          = this.isBossRound || this.mode === '1P';
+    this.isP2CPU          = this.isBossRound || this.mode === '1P' || this.mode === 'PRACTICE';
     this.difficulty     = data.difficulty  || 'medium';
     this.gameState      = 'COUNTDOWN';
     this.roundTimeLeft  = ROUND_TIME;
@@ -77,18 +77,18 @@ class FightScene extends Phaser.Scene {
         : new TacoBoy(this, 200, spawnY);
       this.fighter2 = new GiantTaco(this, W - 220, FLOOR_Y - 80);
 
-      // Super Taco Boss: scale up the existing GiantTaco instance
+      // Super Taco Boss: scale up the existing GiantTaco instance (nerfed)
       if (this.isSuperBossRound) {
         const c = this.fighter2.config;
-        c.maxHp          = 240;
-        c.moveSpeed      = 220;
-        c.knockbackSpeed = 110;
-        c.lightDamage    = 20;
-        c.heavyDamage    = 45;
+        c.maxHp          = 190;
+        c.moveSpeed      = 200;
+        c.knockbackSpeed = 130;
+        c.lightDamage    = 14;
+        c.heavyDamage    = 28;
         this.fighter2.hp    = c.maxHp;
         this.fighter2.maxHp = c.maxHp;
-        // Scale sprite up by 1.35×
-        const scale = 1.35;
+        // Scale sprite up by 1.2×
+        const scale = 1.2;
         this.fighter2._spriteBaseScaleX *= scale;
         this.fighter2._spriteBaseScaleY *= scale;
         if (this.fighter2.sprite) {
@@ -106,6 +106,17 @@ class FightScene extends Phaser.Scene {
 
     this.physics.add.collider(this.fighter1.rect, this._groundObj);
     this.physics.add.collider(this.fighter2.rect, this._groundObj);
+
+    // ── Hit allowance per difficulty ───────────────────────────────────────────
+    const hitsByDiff = { easy: 20, medium: 15, hard: 12, practice: 25 };
+    const maxHits    = hitsByDiff[this.difficulty] || 15;
+    [this.fighter1, this.fighter2].forEach(f => { f.hitsLeft = maxHits; f.maxHits = maxHits; });
+
+    // ── Practice mode: permanent player speed boost ───────────────────────────
+    if (this.mode === 'PRACTICE') {
+      this.fighter1.config.moveSpeed = Math.round(this.fighter1.config.moveSpeed * 1.5);
+      this.fighter1.physBody.setMaxVelocityX(this.fighter1.config.moveSpeed * 1.5);
+    }
 
     // Apply difficulty scaling to CPU fighter's stats
     if (this.isP2CPU) {
@@ -125,9 +136,10 @@ class FightScene extends Phaser.Scene {
   // Returns CPU difficulty overrides based on this.difficulty
   _cpuDifficultyConfig() {
     const presets = {
-      easy:   { damageMult: 0.7,  intervalMin: 2000, intervalMax: 3500, engageDist: 140 },
-      medium: { damageMult: 1.0,  intervalMin: 900,  intervalMax: 1800, engageDist: 110 },
-      hard:   { damageMult: 1.45, intervalMin: 350,  intervalMax: 700,  engageDist: 80  },
+      easy:     { damageMult: 0.8,  intervalMin: 1700, intervalMax: 3000, engageDist: 135 },
+      medium:   { damageMult: 1.05, intervalMin: 800,  intervalMax: 1600, engageDist: 108 },
+      hard:     { damageMult: 1.5,  intervalMin: 320,  intervalMax: 650,  engageDist: 78  },
+      practice: { damageMult: 0.35, intervalMin: 3000, intervalMax: 5500, engageDist: 160 },
     };
     return presets[this.difficulty] || presets.medium;
   }
@@ -172,17 +184,25 @@ class FightScene extends Phaser.Scene {
       fill: '#ffffff', stroke: '#000000', strokeThickness: 5
     }).setOrigin(0.5, 0).setDepth(DEPTH + 3);
 
-    // ── Stamina bars (below health bars) ─────────────────────────────────────
-    const STA_Y = BAR_Y + 16;
-    const STA_H = 7;
-    // P1 stamina
-    this.add.rectangle(P1_BAR_X + BAR_W / 2, STA_Y, BAR_W + 4, STA_H + 4, 0x222222).setDepth(DEPTH);
-    this._p1StaFill = this.add.rectangle(P1_BAR_X, STA_Y, BAR_W, STA_H, 0xf1c40f)
-      .setOrigin(0, 0.5).setDepth(DEPTH + 2);
-    // P2 stamina
-    this.add.rectangle(P2_BAR_RX - BAR_W / 2, STA_Y, BAR_W + 4, STA_H + 4, 0x222222).setDepth(DEPTH);
-    this._p2StaFill = this.add.rectangle(P2_BAR_RX, STA_Y, BAR_W, STA_H, 0xf1c40f)
-      .setOrigin(1, 0.5).setDepth(DEPTH + 2);
+    // ── Hit pip indicators (replaces stamina bar) ─────────────────────────────
+    const PIP_Y    = BAR_Y + 17;
+    const maxHits  = this.fighter1.maxHits;
+    const spacing  = BAR_W / maxHits;
+    const pipR     = Math.min(6, spacing / 2 - 1);
+
+    this._p1HitPips = [];
+    for (let i = 0; i < maxHits; i++) {
+      const cx  = P1_BAR_X + (i + 0.5) * spacing;
+      const pip = this.add.circle(cx, PIP_Y, pipR, 0x27ae60, 1).setDepth(DEPTH + 2);
+      this._p1HitPips.push(pip);
+    }
+
+    this._p2HitPips = [];
+    for (let i = 0; i < maxHits; i++) {
+      const cx  = P2_BAR_RX - (i + 0.5) * spacing;
+      const pip = this.add.circle(cx, PIP_Y, pipR, 0x27ae60, 1).setDepth(DEPTH + 2);
+      this._p2HitPips.push(pip);
+    }
 
     // ── Round pips ──
     this._pipGraphics = this.add.graphics().setDepth(DEPTH + 3);
@@ -227,7 +247,10 @@ class FightScene extends Phaser.Scene {
     const W = this.scale.width;
     const H = this.scale.height;
     let roundLabel, subLabel;
-    if (this.isSuperBossRound) {
+    if (this.mode === 'PRACTICE') {
+      roundLabel = 'PRACTICE MODE';
+      subLabel   = 'Speed boost active — go easy on them!';
+    } else if (this.isSuperBossRound) {
       roundLabel = 'SUPER TACO BOSS!!';
       subLabel   = 'He\'s angrier. He\'s bigger. Good luck.';
     } else if (this.isBossRound) {
@@ -378,7 +401,7 @@ class FightScene extends Phaser.Scene {
 
     // Apply damage multipliers: power-up boost × counter boost × shield reduction
     const isCounter   = attacker._counterBoost > 1;
-    const shieldMult  = defender._shieldActive ? 0.08 : 1;
+    const shieldMult  = defender._shieldActive ? 0.25 : 1;
     const finalDmg    = Math.ceil(baseDmg * (attacker._damageMult || 1) * (attacker._counterBoost || 1) * shieldMult);
     if (isCounter) { attacker._counterBoost = 1; attacker._counterTimer = 0; }
 
@@ -464,13 +487,23 @@ class FightScene extends Phaser.Scene {
     this._p1BarFill.fillColor = this._hpColor(p1Pct);
     this._p2BarFill.fillColor = this._hpColor(p2Pct);
 
-    // ── Stamina bars ─────────────────────────────────────────────────────────
-    const p1Sta = Math.max(0, this.fighter1.stamina / this.fighter1.maxStamina);
-    const p2Sta = Math.max(0, this.fighter2.stamina / this.fighter2.maxStamina);
-    this._p1StaFill.scaleX = p1Sta;
-    this._p2StaFill.scaleX = p2Sta;
-    this._p1StaFill.fillColor = this.fighter1._exhausted ? 0xe74c3c : (p1Sta > 0.35 ? 0xf1c40f : 0xe67e22);
-    this._p2StaFill.fillColor = this.fighter2._exhausted ? 0xe74c3c : (p2Sta > 0.35 ? 0xf1c40f : 0xe67e22);
+    // ── Hit pip indicators ────────────────────────────────────────────────────
+    const p1Hits = this.fighter1.hitsLeft;
+    const p2Hits = this.fighter2.hitsLeft;
+    if (this._p1HitPips) {
+      this._p1HitPips.forEach((pip, i) => {
+        const avail = i < p1Hits;
+        pip.fillColor = avail ? (p1Hits <= 3 ? 0xe74c3c : 0x27ae60) : 0x222222;
+        pip.setAlpha(avail ? 1 : 0.25);
+      });
+    }
+    if (this._p2HitPips) {
+      this._p2HitPips.forEach((pip, i) => {
+        const avail = i < p2Hits;
+        pip.fillColor = avail ? (p2Hits <= 3 ? 0xe74c3c : 0x27ae60) : 0x222222;
+        pip.setAlpha(avail ? 1 : 0.25);
+      });
+    }
   }
 
   _hpColor(pct) {
@@ -532,6 +565,12 @@ class FightScene extends Phaser.Scene {
           victoryTextureKey: f.config.victoryTextureKey || null,
         });
       };
+
+      // ── Practice mode — always return to menu ────────────────────────────
+      if (this.mode === 'PRACTICE') {
+        this.scene.start('MenuScene');
+        return;
+      }
 
       // ── Boss round ───────────────────────────────────────────────────────
       if (this.isBossRound) {
@@ -759,9 +798,10 @@ class FightScene extends Phaser.Scene {
 
     // First shot is a little later so player has time to settle
     const intervals = {
-      easy:   { min: 5000, max: 7500, first: 7000 },
-      medium: { min: 3000, max: 5000, first: 4500 },
-      hard:   { min: 1600, max: 3000, first: 3500 },
+      easy:     { min: 6000, max: 9000, first: 8000 },
+      medium:   { min: 3500, max: 6000, first: 5000 },
+      hard:     { min: 1800, max: 3200, first: 3800 },
+      practice: { min: 8000, max: 12000, first: 10000 },
     };
     const iv = intervals[this.difficulty] || intervals.medium;
     this._bossShootMin      = iv.min;
@@ -928,7 +968,7 @@ class FightScene extends Phaser.Scene {
     // ── Enrage at 50 % HP ────────────────────────────────────────────────────
     if (!this._bossEnraged && boss.hp < boss.maxHp * 0.5) {
       this._bossEnraged = true;
-      boss.config.moveSpeed   = Math.round(boss.config.moveSpeed * 1.4);
+      boss.config.moveSpeed   = Math.round(boss.config.moveSpeed * 1.2);
       this._bossShootMin      = Math.round(this._bossShootMin * 0.5);
       this._bossShootMax      = Math.round(this._bossShootMax * 0.5);
       if (boss._visual) boss._visual.setTint(0xff3300);
@@ -987,7 +1027,7 @@ class FightScene extends Phaser.Scene {
           sw.hitFired = true;
           sw.obj.destroy();
           this._stompShockwaves.splice(i, 1);
-          const dmg = f.takeDamage(22, sw.vx > 0 ? 1 : -1);
+          const dmg = f.takeDamage(16, sw.vx > 0 ? 1 : -1);
           this.tweens.killTweensOf(this._p1Smooth);
           this.tweens.add({ targets: this._p1Smooth, hp: f.hp, duration: 280, ease: 'Power2' });
           this._spawnHitText(f.x, f.y - f.config.height / 2, dmg, true);

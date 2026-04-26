@@ -24,11 +24,11 @@ class Fighter {
     this.isAlive     = true;
     this.cooldowns   = { light: 0, heavy: 0, hit: 0 };
 
-    // ── Stamina (anti-mash) ───────────────────────────────────────────────────
-    this.stamina        = 100;
-    this.maxStamina     = 100;
-    this._exhausted     = false;   // true while stamina penalty is active
-    this._exhaustedTimer = 0;      // ms remaining
+    // ── Hit allowance (anti-mash) — set by FightScene based on difficulty ─────
+    this.hitsLeft            = 20;   // overridden by FightScene after construction
+    this.maxHits             = 20;
+    this._hitRegenTimer      = 0;    // ms since last hit regen tick
+    this._outOfHitsPopupShown = false;
 
     // ── Counter window ────────────────────────────────────────────────────────
     this._counterBoost = 1;        // damage multiplier for next attack
@@ -189,10 +189,20 @@ class Fighter {
 
   lightAttack() {
     if (!this.canAttack() || this.cooldowns.light > 0) return;
-    // Stamina cost — exhaustion if empty
-    const lightCost = 15;
-    if (this.stamina < lightCost) { this._triggerExhaustion(); return; }
-    this.stamina -= lightCost;
+    // Hit allowance cost (light = 1 hit)
+    if (this.hitsLeft < 1) {
+      if (!this._outOfHitsPopupShown) {
+        this._outOfHitsPopupShown = true;
+        const tx = this.scene.add.text(this.x, this.y - this._dH / 2 - 10, 'NO HITS LEFT!', {
+          fontSize: '16px', fontFamily: 'Arial Black, Arial',
+          fill: '#ff6600', stroke: '#000000', strokeThickness: 3,
+        }).setOrigin(0.5, 1).setDepth(70);
+        this.scene.tweens.add({ targets: tx, y: tx.y - 40, alpha: 0, duration: 900, ease: 'Power2', onComplete: () => tx.destroy() });
+        this.scene.time.delayedCall(1800, () => { this._outOfHitsPopupShown = false; });
+      }
+      return;
+    }
+    this.hitsLeft -= 1;
     this.state = STATES.ATTACK_LIGHT;
     this.hitboxActive    = true;
     this.attackHitLanded = false;
@@ -211,10 +221,20 @@ class Fighter {
 
   heavyAttack() {
     if (!this.canAttack() || this.cooldowns.heavy > 0) return;
-    // Stamina cost
-    const heavyCost = 28;
-    if (this.stamina < heavyCost) { this._triggerExhaustion(); return; }
-    this.stamina -= heavyCost;
+    // Hit allowance cost (heavy = 2 hits)
+    if (this.hitsLeft < 2) {
+      if (!this._outOfHitsPopupShown) {
+        this._outOfHitsPopupShown = true;
+        const tx = this.scene.add.text(this.x, this.y - this._dH / 2 - 10, 'NO HITS LEFT!', {
+          fontSize: '16px', fontFamily: 'Arial Black, Arial',
+          fill: '#ff6600', stroke: '#000000', strokeThickness: 3,
+        }).setOrigin(0.5, 1).setDepth(70);
+        this.scene.tweens.add({ targets: tx, y: tx.y - 40, alpha: 0, duration: 900, ease: 'Power2', onComplete: () => tx.destroy() });
+        this.scene.time.delayedCall(1800, () => { this._outOfHitsPopupShown = false; });
+      }
+      return;
+    }
+    this.hitsLeft -= 2;
     this.state = STATES.ATTACK_HEAVY;
     this.hitboxActive    = true;
     this.attackHitLanded = false;
@@ -274,24 +294,6 @@ class Fighter {
     return dmg;
   }
 
-  _triggerExhaustion() {
-    if (this._exhausted) return;
-    this._exhausted      = true;
-    this._exhaustedTimer = 1500;
-    this.stamina         = 0;
-
-    // Visual pop-up
-    const tx = this.scene.add.text(this.x, this.y - this._dH / 2 - 10, 'EXHAUSTED!', {
-      fontSize: '18px', fontFamily: 'Arial Black, Arial',
-      fill: '#ff8800', stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5, 1).setDepth(70);
-    this.scene.tweens.add({
-      targets: tx, y: tx.y - 50, alpha: 0,
-      duration: 1300, ease: 'Power2',
-      onComplete: () => tx.destroy(),
-    });
-  }
-
   _triggerKO() {
     this.isAlive      = false;
     this.isBlocking   = false;
@@ -341,7 +343,6 @@ class Fighter {
 
   canAttack() {
     return this.isAlive &&
-      !this._exhausted &&
       this.state !== STATES.KO &&
       this.state !== STATES.HIT &&
       this.state !== STATES.BLOCK;
@@ -401,19 +402,15 @@ class Fighter {
     this.cooldowns.heavy = Math.max(0, this.cooldowns.heavy - delta);
     this.cooldowns.hit   = Math.max(0, this.cooldowns.hit   - delta);
 
-    // ── Stamina regen (only while not actively swinging) ──────────────────────
-    if (this.state !== STATES.ATTACK_LIGHT && this.state !== STATES.ATTACK_HEAVY) {
-      this.stamina = Math.min(this.maxStamina, this.stamina + 30 * (delta / 1000));
-    }
-
-    // ── Exhaustion countdown ──────────────────────────────────────────────────
-    if (this._exhausted) {
-      this._exhaustedTimer -= delta;
-      if (this._exhaustedTimer <= 0) {
-        this._exhausted      = false;
-        this._exhaustedTimer = 0;
-        this.stamina         = 25; // enough for a couple of attacks after recovery
+    // ── Hit regen — 1 hit restored every 2.5 s ───────────────────────────────
+    if (this.hitsLeft < this.maxHits) {
+      this._hitRegenTimer += delta;
+      if (this._hitRegenTimer >= 2500) {
+        this._hitRegenTimer = 0;
+        this.hitsLeft = Math.min(this.maxHits, this.hitsLeft + 1);
       }
+    } else {
+      this._hitRegenTimer = 0;
     }
 
     // ── Counter boost expiry ──────────────────────────────────────────────────
@@ -455,11 +452,11 @@ class Fighter {
     this.state       = STATES.IDLE;
     this.hitboxActive    = false;
     this.attackHitLanded = false;
-    this.cooldowns       = { light: 0, heavy: 0, hit: 0 };
-    this.stamina         = this.maxStamina;
-    this._exhausted      = false;
-    this._exhaustedTimer = 0;
-    this._counterBoost   = 1;
+    this.cooldowns            = { light: 0, heavy: 0, hit: 0 };
+    this.hitsLeft             = this.maxHits;
+    this._hitRegenTimer       = 0;
+    this._outOfHitsPopupShown = false;
+    this._counterBoost        = 1;
     this._counterTimer   = 0;
     this._hitStreak      = 0;
     this._hitStreakTimer = 0;
