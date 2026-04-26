@@ -7,6 +7,10 @@ class BootScene extends Phaser.Scene {
     // Stage backgrounds
     this.load.image('stageBg',      'assets/game-stage.png');
     this.load.image('introBg',      'assets/intro-stage.png');
+
+    // Neon title sign (two states for flicker effect)
+    this.load.image('neonTitle1',   'assets/intro-title-state1.png');
+    this.load.image('neonTitle2',   'assets/intro-title-state2.png');
     this.load.image('roundWinBg',   'assets/round-win-stage.png');
     this.load.image('gameOverBg',   'assets/game-over-stage.png');
 
