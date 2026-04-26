@@ -18,56 +18,32 @@ class MenuScene extends Phaser.Scene {
     // ── Background ────────────────────────────────────────────────────────────
     this.add.image(W / 2, H / 2, 'introBg').setDisplaySize(W, H).setDepth(0);
 
-    // ── Falling confetti (behind all UI) ──────────────────────────────────────
+    // ── Falling confetti ──────────────────────────────────────────────────────
     this._startConfetti();
 
-    // ── Neon sign backlight glow ──────────────────────────────────────────────
-    // Simulates the sign illuminating the space around it
-    const glowG = this.add.graphics().setDepth(1);
-    glowG.fillStyle(0xFF69B4, 0.11);
-    glowG.fillEllipse(W / 2 - 20, 138, 500, 190);
-    glowG.fillStyle(0x22CCFF, 0.09);
-    glowG.fillEllipse(W / 2 + 15, 155, 480, 170);
-
-    // Subtle warm floor glow at the very bottom
-    glowG.fillStyle(0xFF8822, 0.06);
-    glowG.fillEllipse(W / 2, H, 920, 220);
-
-    // ── Neon sign images ──────────────────────────────────────────────────────
-    this._neonState1 = this.add.image(W / 2, 145, 'neonTitle1')
-      .setDisplaySize(500, 215)
+    // ── 3D title sign ─────────────────────────────────────────────────────────
+    // Native: 1672 × 941 → aspect ratio 1.777  →  480 × 270
+    const sign = this.add.image(W / 2, 152, 'sign3d')
+      .setDisplaySize(480, 270)
       .setDepth(2);
 
-    this._neonState2 = this.add.image(W / 2, 145, 'neonTitle2')
-      .setDisplaySize(500, 215)
-      .setDepth(2)
-      .setVisible(false);
-
-    // Gentle float — both images move together so flicker looks seamless
+    // Gentle float
     this.tweens.add({
-      targets: [this._neonState1, this._neonState2],
-      y: 137,
+      targets: sign,
+      y: 144,
       duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     });
 
-    // Start the neon flicker loop
-    this._startNeonFlicker();
-
     // ── Tagline ───────────────────────────────────────────────────────────────
-    this.add.text(W / 2, 272, '🌮  The Ultimate Taco Fighting Experience  🌮', {
+    this.add.text(W / 2, 302, '🌮  The Ultimate Taco Fighting Experience  🌮', {
       fontSize: '16px', fontFamily: 'Arial',
-      fill: '#FFB8D8', stroke: '#000000', strokeThickness: 3,
+      fill: '#ffffff', stroke: '#000000', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(2);
 
-    // ── Dark UI panel (frosted glass behind all buttons) ──────────────────────
-    this.add.rectangle(W / 2, 437, 950, 284, 0x04040f, 0.62)
-      .setStrokeStyle(1, 0x2a1040, 1)
-      .setDepth(1.8);
-
     // ── Mode buttons ──────────────────────────────────────────────────────────
-    this._makeBtn(W / 2 - 178, 320, '1 PLAYER',  0xaa1844, 0xFF69B4, () => this._start('1P'));
-    this._makeBtn(W / 2 + 178, 320, '2 PLAYERS', 0x124b88, 0x22CCFF, () => this._start('2P'));
-    this._makePracticeBtn(W / 2, 366);
+    this._makeBtn(W / 2 - 178, 348, '1 PLAYER',  0xaa1844, 0xFF69B4, () => this._start('1P'));
+    this._makeBtn(W / 2 + 178, 348, '2 PLAYERS', 0x124b88, 0x22CCFF, () => this._start('2P'));
+    this._makePracticeBtn(W / 2, 394);
 
     // ── Flow description ──────────────────────────────────────────────────────
     const flowLines = [
@@ -75,37 +51,32 @@ class MenuScene extends Phaser.Scene {
       '2P — Best of 2 rounds, winner fights the Boss!',
     ];
     flowLines.forEach((line, i) => {
-      this.add.text(W / 2, 407 + i * 20, line, {
-        fontSize: '13px', fontFamily: 'Arial',
-        fill: '#999999', stroke: '#000000', strokeThickness: 2,
+      this.add.text(W / 2, 432 + i * 20, line, {
+        fontSize: '13px', fontFamily: 'Arial Black, Arial',
+        fill: '#ffffff', stroke: '#000000', strokeThickness: 3,
       }).setOrigin(0.5).setDepth(3);
     });
 
-    // ── Separator ─────────────────────────────────────────────────────────────
-    const sep = this.add.graphics().setDepth(2.5);
-    sep.lineStyle(1, 0x331155, 1);
-    sep.lineBetween(80, 453, W - 80, 453);
-
     // ── Difficulty selector ───────────────────────────────────────────────────
-    this.add.text(W / 2, 465, 'DIFFICULTY', {
+    this.add.text(W / 2, 480, 'DIFFICULTY', {
       fontSize: '13px', fontFamily: 'Arial Black, Arial',
-      fill: '#CC88FF', stroke: '#000000', strokeThickness: 3,
+      fill: '#FFD700', stroke: '#000000', strokeThickness: 4,
     }).setOrigin(0.5).setDepth(3);
 
     const diffLevels = [
-      { key: 'easy',   label: 'EASY',   x: W / 2 - 160, color: 0x153a22, glow: 0x2ecc71 },
-      { key: 'medium', label: 'MEDIUM', x: W / 2,       color: 0x3d2008, glow: 0xf39c12 },
-      { key: 'hard',   label: 'HARD',   x: W / 2 + 160, color: 0x3d0808, glow: 0xe74c3c },
+      { key: 'easy',   label: 'EASY',   x: W / 2 - 160, color: 0x1a5c2e, glow: 0x2ecc71 },
+      { key: 'medium', label: 'MEDIUM', x: W / 2,       color: 0x7a4010, glow: 0xf39c12 },
+      { key: 'hard',   label: 'HARD',   x: W / 2 + 160, color: 0x7a1010, glow: 0xe74c3c },
     ];
 
     this._diffBtns = [];
     diffLevels.forEach(d => {
-      const bg = this.add.rectangle(d.x, 503, 138, 40, d.color)
+      const bg = this.add.rectangle(d.x, 516, 138, 40, d.color)
         .setInteractive({ useHandCursor: true })
-        .setStrokeStyle(2, 0x555555)
+        .setStrokeStyle(2, 0xffffff)
         .setDepth(3);
 
-      const txt = this.add.text(d.x, 503, d.label, {
+      const txt = this.add.text(d.x, 516, d.label, {
         fontSize: '15px', fontFamily: 'Arial Black, Arial',
         fill: '#ffffff', stroke: '#000000', strokeThickness: 3,
       }).setOrigin(0.5).setDepth(4);
@@ -120,55 +91,17 @@ class MenuScene extends Phaser.Scene {
     this._refreshDiffVisuals();
 
     // ── Tip ───────────────────────────────────────────────────────────────────
-    this.add.text(W / 2, 551, 'Collect power-ups during battle for bonus damage & speed!', {
+    this.add.text(W / 2, 563, 'Collect power-ups during battle for bonus damage & speed!', {
       fontSize: '12px', fontFamily: 'Arial',
-      fill: '#555555', stroke: '#000000', strokeThickness: 2,
+      fill: '#ffffff', stroke: '#000000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(3);
 
     // ── Ambient side orbs ─────────────────────────────────────────────────────
-    this._addDeco(52,  215, 0xFF69B4, 20);
-    this._addDeco(972, 215, 0x22CCFF, 20);
+    this._addDeco(52,  220, 0xF4A460, 22);
+    this._addDeco(972, 220, 0xFF69B4, 22);
 
     // ── Sound toggle ──────────────────────────────────────────────────────────
     this._addSoundToggle();
-  }
-
-  // ── Neon flicker ─────────────────────────────────────────────────────────────
-
-  _startNeonFlicker() {
-    const flicker = () => {
-      // Randomly flicker 1–4 times per burst
-      const count = Phaser.Math.Between(1, 4);
-      let t = 0;
-
-      for (let i = 0; i < count; i++) {
-        // Dim (state 2)
-        this.time.delayedCall(t, () => {
-          this._neonState1?.setVisible(false);
-          this._neonState2?.setVisible(true);
-        });
-        t += Phaser.Math.Between(30, 110);
-
-        // Bright (state 1)
-        this.time.delayedCall(t, () => {
-          this._neonState1?.setVisible(true);
-          this._neonState2?.setVisible(false);
-        });
-        t += Phaser.Math.Between(50, 200);
-      }
-
-      // Ensure we always end on the bright state
-      this.time.delayedCall(t, () => {
-        this._neonState1?.setVisible(true);
-        this._neonState2?.setVisible(false);
-      });
-
-      // Schedule next burst: 2.5–9 seconds from now
-      this.time.delayedCall(t + Phaser.Math.Between(2500, 9000), flicker);
-    };
-
-    // First flicker after 1.5–4 seconds so it feels natural on scene entry
-    this.time.delayedCall(Phaser.Math.Between(1500, 4000), flicker);
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -209,8 +142,8 @@ class MenuScene extends Phaser.Scene {
     if (!this._diffBtns) return;
     this._diffBtns.forEach(d => {
       const selected = d.key === this._difficulty;
-      d.bg.setStrokeStyle(selected ? 3 : 2, selected ? 0xFFD700 : 0x555555);
-      d.bg.setAlpha(selected ? 1 : 0.60);
+      d.bg.setStrokeStyle(selected ? 3 : 2, selected ? 0xFFD700 : 0xffffff);
+      d.bg.setAlpha(selected ? 1 : 0.65);
       d.txt.setScale(selected ? 1.1 : 1);
     });
   }
@@ -228,26 +161,23 @@ class MenuScene extends Phaser.Scene {
   }
 
   _makePracticeBtn(x, y) {
-    // Glow halo
-    this.add.rectangle(x, y, 204, 44, 0x2ecc71, 0.14).setDepth(2);
-
-    const bg = this.add.rectangle(x, y, 194, 38, 0x0e3320)
+    const bg = this.add.rectangle(x, y, 200, 40, 0x1a6635)
       .setInteractive({ useHandCursor: true })
-      .setStrokeStyle(2, 0x2ecc71)
+      .setStrokeStyle(3, 0xFFD700)
       .setDepth(2.5);
 
-    const txt = this.add.text(x, y - 2, 'PRACTICE', {
-      fontSize: '15px', fontFamily: 'Arial Black, Arial',
-      fill: '#aaffaa', stroke: '#000000', strokeThickness: 3,
+    const txt = this.add.text(x, y, 'PRACTICE', {
+      fontSize: '16px', fontFamily: 'Arial Black, Arial',
+      fill: '#ffffff', stroke: '#000000', strokeThickness: 3,
     }).setOrigin(0.5).setDepth(3);
 
     bg.on('pointerover',  () => { bg.setAlpha(0.85); txt.setScale(1.05); });
     bg.on('pointerout',   () => { bg.setAlpha(1);    txt.setScale(1);    });
     bg.on('pointerdown',  () => this._showPracticeEnemySelect());
 
-    this.add.text(x, y + 14, 'Speed boost  •  Weak enemies  •  25 hits', {
+    this.add.text(x, y + 22, 'Speed boost  •  Weak enemies  •  25 hits', {
       fontSize: '10px', fontFamily: 'Arial',
-      fill: '#55aa77', stroke: '#000', strokeThickness: 2,
+      fill: '#aaffaa', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(3);
   }
 
@@ -339,12 +269,9 @@ class MenuScene extends Phaser.Scene {
   }
 
   _makeBtn(x, y, label, fillColor, strokeColor, onClick) {
-    // Soft neon glow halo behind button
-    this.add.rectangle(x, y, 236, 66, strokeColor, 0.14).setDepth(2);
-
     const bg = this.add.rectangle(x, y, 224, 58, fillColor)
       .setInteractive({ useHandCursor: true })
-      .setStrokeStyle(2, strokeColor)
+      .setStrokeStyle(3, strokeColor)
       .setDepth(2.5);
 
     const txt = this.add.text(x, y, label, {
