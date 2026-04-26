@@ -17,7 +17,9 @@ class GameOverScene extends Phaser.Scene {
 
     // ── Music / SFX ──────────────────────────────────────────────────────────
     this.sound.stopAll();
-    this.sound.play('sfx_crowd_cheer', { volume: 0.65 });
+    if (this.cache.audio.exists('sfx_crowd_cheer')) {
+      this.sound.play('sfx_crowd_cheer', { volume: 0.65 });
+    }
 
     // Stage background
     if (this.textures.exists('gameOverBg')) {

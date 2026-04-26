@@ -5,7 +5,7 @@ const game = new Phaser.Game({
   type: Phaser.AUTO,
   width: GAME_WIDTH,
   height: GAME_HEIGHT,
-  backgroundColor: '#87CEEB',
+  backgroundColor: '#1a1a2e',
   physics: {
     default: 'arcade',
     arcade: {

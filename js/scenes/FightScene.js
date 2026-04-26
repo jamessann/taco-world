@@ -49,7 +49,9 @@ class FightScene extends Phaser.Scene {
     // ── Music ────────────────────────────────────────────────────────────────
     this.sound.stopAll();
     const _musicKey = (this.isBossRound || this.isSuperBossRound) ? 'music_boss' : 'music_fight';
-    this.sound.play(_musicKey, { loop: true, volume: 0.35 });
+    if (this.cache.audio.exists(_musicKey)) {
+      this.sound.play(_musicKey, { loop: true, volume: 0.35 });
+    }
 
     // ── Sound toggle ─────────────────────────────────────────────────────────
     this._addSoundToggle();

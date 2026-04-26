@@ -11,7 +11,9 @@ class MenuScene extends Phaser.Scene {
 
     // ── Music ────────────────────────────────────────────────────────────────
     this.sound.stopAll();
-    this.sound.play('music_menu', { loop: true, volume: 0.35 });
+    if (this.cache.audio.exists('music_menu')) {
+      this.sound.play('music_menu', { loop: true, volume: 0.35 });
+    }
 
     // Background
     this.add.image(W / 2, H / 2, 'introBg').setDisplaySize(W, H).setDepth(0);
