@@ -98,6 +98,9 @@ class GameOverScene extends Phaser.Scene {
     this.tweens.add({ targets: banner, scaleX: 1, scaleY: 1, duration: 350, ease: 'Back.easeOut' });
     this.tweens.add({ targets: wins,   scaleX: 1, scaleY: 1, duration: 350, ease: 'Back.easeOut', delay: 200 });
 
+    // Burst confetti from centre once the announcement lands
+    this.time.delayedCall(420, () => this._burstConfetti(W / 2, H / 2 - 10));
+
     // Colour pulse on winner text
     this.tweens.addCounter({
       from: 0, to: 1, duration: 900, yoyo: true, repeat: -1,
@@ -147,6 +150,38 @@ class GameOverScene extends Phaser.Scene {
       fontSize: '13px', fontFamily: 'Arial',
       fill: '#777777'
     }).setOrigin(0.5).setDepth(10);
+  }
+
+  // Explosive burst of confetti radiating from (cx, cy) — one-shot, fades out
+  _burstConfetti(cx, cy) {
+    const colors = [0xFFD700, 0xFF6347, 0xFF69B4, 0xF4A460, 0x87CEEB, 0x2ecc71, 0xffffff];
+
+    for (let i = 0; i < 55; i++) {
+      const angle  = Phaser.Math.Between(0, 360);
+      const speed  = Phaser.Math.Between(120, 420);
+      const rad    = Phaser.Math.DegToRad(angle);
+      const destX  = cx + Math.cos(rad) * speed;
+      const destY  = cy + Math.sin(rad) * speed;
+      const size   = Phaser.Math.Between(5, 14);
+      const col    = Phaser.Utils.Array.GetRandom(colors);
+      const dur    = Phaser.Math.Between(700, 1800);
+
+      const rect = this.add.rectangle(cx, cy, size, Math.round(size * 0.55), col, 1)
+        .setAngle(angle)
+        .setDepth(35);
+
+      this.tweens.add({
+        targets:  rect,
+        x:        destX,
+        y:        destY + Phaser.Math.Between(40, 120), // arc downward under gravity feel
+        angle:    angle + Phaser.Math.Between(-540, 540),
+        alpha:    0,
+        duration: dur,
+        delay:    Phaser.Math.Between(0, 180),
+        ease:     'Power2',
+        onComplete: () => rect.destroy(),
+      });
+    }
   }
 
   _spawnConfetti() {

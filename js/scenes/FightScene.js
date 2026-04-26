@@ -54,9 +54,20 @@ class FightScene extends Phaser.Scene {
     const H = this.scale.height;
 
     // Background image — scaled to fill the canvas, depth 0 (behind everything)
-    this.add.image(W / 2, H / 2, 'stageBg')
-      .setDisplaySize(W, H)
+    // Slightly wider than canvas so the sway tween never reveals an edge
+    const stageBg = this.add.image(W / 2, H / 2, 'stageBg')
+      .setDisplaySize(W + 32, H + 8)
       .setDepth(0);
+
+    // Subtle crowd-sway: gentle left-right drift on the background layer
+    this.tweens.add({
+      targets:  stageBg,
+      x:        W / 2 + 10,
+      duration: 3500,
+      yoyo:     true,
+      repeat:   -1,
+      ease:     'Sine.easeInOut',
+    });
 
     // Invisible physics ground — visual floor comes from the background image
     this._groundObj = this.add.rectangle(W / 2, FLOOR_Y + 16, W, 32, 0x000000, 0);

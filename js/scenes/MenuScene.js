@@ -92,6 +92,9 @@ class MenuScene extends Phaser.Scene {
     // ── Floating deco ────────────────────────────────────────────────────────
     this._addDeco(80,  200, 0xF4A460, 30);
     this._addDeco(944, 200, 0xFF69B4, 30);
+
+    // ── Falling confetti ─────────────────────────────────────────────────────
+    this._startConfetti();
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -256,6 +259,40 @@ class MenuScene extends Phaser.Scene {
       scaleX: 1.03, scaleY: 1.03,
       duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
     });
+  }
+
+  _startConfetti() {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    const colors = [0xFFD700, 0xFF6347, 0xFF69B4, 0xF4A460, 0x87CEEB, 0x2ecc71, 0xffffff];
+
+    for (let i = 0; i < 45; i++) {
+      const startX = Phaser.Math.Between(0, W);
+      const size   = Phaser.Math.Between(5, 12);
+      const col    = Phaser.Utils.Array.GetRandom(colors);
+      const dur    = Phaser.Math.Between(2800, 5500);
+      const drift  = Phaser.Math.Between(-90, 90);
+
+      const rect = this.add.rectangle(startX, -size, size, Math.round(size * 0.55), col, 0.85)
+        .setAngle(Phaser.Math.Between(0, 360))
+        .setDepth(0.5);
+
+      this.tweens.add({
+        targets:  rect,
+        y:        H + size,
+        x:        startX + drift,
+        angle:    rect.angle + Phaser.Math.Between(-400, 400),
+        duration: dur,
+        delay:    Phaser.Math.Between(0, dur),
+        ease:     'Linear',
+        repeat:   -1,
+        onRepeat: (tween) => {
+          const r = tween.targets[0];
+          r.setPosition(Phaser.Math.Between(0, W), -size);
+          r.setAlpha(0.85);
+        },
+      });
+    }
   }
 
   _addDeco(x, y, color, r) {
