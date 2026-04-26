@@ -50,6 +50,36 @@ class FightScene extends Phaser.Scene {
     this.sound.stopAll();
     const _musicKey = (this.isBossRound || this.isSuperBossRound) ? 'music_boss' : 'music_fight';
     this.sound.play(_musicKey, { loop: true, volume: 0.35 });
+
+    // ── Sound toggle ─────────────────────────────────────────────────────────
+    this._addSoundToggle();
+  }
+
+  _addSoundToggle() {
+    if (window._tacoMuted === undefined) window._tacoMuted = false;
+    this.sound.mute = window._tacoMuted;
+
+    const x = this.scale.width  - 44;
+    const y = this.scale.height - 26;
+
+    const bg = this.add.rectangle(x, y, 76, 28, 0x000000, 0.65)
+      .setStrokeStyle(1, 0x555555)
+      .setDepth(200)
+      .setInteractive({ useHandCursor: true });
+
+    const lbl = this.add.text(x, y, window._tacoMuted ? '🔇 OFF' : '🔊 ON', {
+      fontSize: '13px', fontFamily: 'Arial',
+      fill: window._tacoMuted ? '#888888' : '#ffffff',
+    }).setOrigin(0.5).setDepth(201);
+
+    bg.on('pointerdown', () => {
+      window._tacoMuted = !window._tacoMuted;
+      this.sound.mute   = window._tacoMuted;
+      lbl.setText(window._tacoMuted ? '🔇 OFF' : '🔊 ON');
+      lbl.setFill(window._tacoMuted ? '#888888' : '#ffffff');
+    });
+    bg.on('pointerover', () => bg.setFillStyle(0x333333, 0.85));
+    bg.on('pointerout',  () => bg.setFillStyle(0x000000, 0.65));
   }
 
   // ─── Stage ───────────────────────────────────────────────────────────────────
