@@ -15,6 +15,10 @@ class GameOverScene extends Phaser.Scene {
     const W = this.scale.width;
     const H = this.scale.height;
 
+    // ── Music / SFX ──────────────────────────────────────────────────────────
+    this.sound.stopAll();
+    this.sound.play('sfx_crowd_cheer', { volume: 0.65 });
+
     // Stage background
     if (this.textures.exists('gameOverBg')) {
       this.add.image(W / 2, H / 2, 'gameOverBg').setDisplaySize(W, H);

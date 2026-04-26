@@ -45,6 +45,11 @@ class FightScene extends Phaser.Scene {
     if (this.isBossRound) this._setupBossProjectiles();
     if (this.isSuperBossRound) this._setupSuperBossAbilities();
     this._startRoundCountdown();
+
+    // ── Music ────────────────────────────────────────────────────────────────
+    this.sound.stopAll();
+    const _musicKey = (this.isBossRound || this.isSuperBossRound) ? 'music_boss' : 'music_fight';
+    this.sound.play(_musicKey, { loop: true, volume: 0.35 });
   }
 
   // ─── Stage ───────────────────────────────────────────────────────────────────
@@ -326,6 +331,9 @@ class FightScene extends Phaser.Scene {
     const W = this.scale.width;
     const H = this.scale.height;
 
+    // Ring the bell!
+    this.sound.play('sfx_bell', { volume: 0.75 });
+
     const txt = this.add.text(W / 2, H / 2, 'FIGHT!', {
       fontSize: '80px', fontFamily: 'Arial Black, Arial',
       fill: '#ffffff', stroke: '#FF6347', strokeThickness: 12
@@ -411,6 +419,7 @@ class FightScene extends Phaser.Scene {
 
     // Landed!
     attacker.attackHitLanded = true;
+    this.sound.play('sfx_hit', { volume: 0.65 });
 
     const isHeavy = attacker.state === STATES.ATTACK_HEAVY;
     const baseDmg = isHeavy ? attacker.config.heavyDamage : attacker.config.lightDamage;
@@ -552,6 +561,11 @@ class FightScene extends Phaser.Scene {
   _endRound(winnerId, reason) {
     this.fighter1.physBody.setVelocityX(0);
     this.fighter2.physBody.setVelocityX(0);
+
+    // Crowd reacts — cheer on KO, quieter groan on time-out
+    if (reason === 'KO') {
+      this.sound.play('sfx_crowd_cheer', { volume: 0.6 });
+    }
 
     if (winnerId === 1) this.p1Wins++;
     else                this.p2Wins++;
@@ -765,6 +779,7 @@ class FightScene extends Phaser.Scene {
     pu.gfx.destroy();
     pu.rim.destroy();
     pu.lbl.destroy();
+    this.sound.play('sfx_powerup', { volume: 0.7 });
 
     // Flash collect text
     const txt = this.add.text(fighter.x, fighter.y - 70, pu.label, {
@@ -906,6 +921,8 @@ class FightScene extends Phaser.Scene {
     const speed  = 400;
     const projY  = FLOOR_Y - 75;                  // mid-body of a standing fighter
     const startX = boss.x + dirX * (boss.config.width / 2 + 15);
+
+    this.sound.play('sfx_whoosh', { volume: 0.45 });
 
     // Spinning taco shell (circle + label)
     const gfx = this.add.circle(startX, projY, 20, 0xFF6347, 1)

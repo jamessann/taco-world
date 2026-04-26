@@ -183,6 +183,7 @@ class Fighter {
       this.physBody.setVelocityY(-this.config.jumpSpeed);
       this.state = STATES.JUMP;
       this.isBlocking = false;
+      this.scene.sound.play('sfx_jump', { volume: 0.5 });
     }
   }
 
@@ -205,6 +206,7 @@ class Fighter {
     }
     this.hitsLeft -= 1;
     this.state = STATES.ATTACK_LIGHT;
+    this.scene.sound.play('sfx_punch_light', { volume: 0.6 });
     this.hitboxActive    = true;
     this.attackHitLanded = false;
     this.cooldowns.light = this.config.lightCooldown;
@@ -237,6 +239,7 @@ class Fighter {
     }
     this.hitsLeft -= 2;
     this.state = STATES.ATTACK_HEAVY;
+    this.scene.sound.play('sfx_punch_heavy', { volume: 0.65 });
     this.hitboxActive    = true;
     this.attackHitLanded = false;
     this.cooldowns.heavy = this.config.heavyCooldown;

@@ -62,9 +62,18 @@ class BootScene extends Phaser.Scene {
     this.load.image('gt_ko',           'assets/tb-12-taco-boss-ko-falling.png');
     this.load.image('gt_ko_down',      'assets/tb-13-taco-boss-ko-down.png');
 
-    // this.load.audio('bgMusic',   'assets/music.mp3');
-    // this.load.audio('sfxHit',    'assets/hit.mp3');
-    // this.load.audio('sfxKO',     'assets/ko.mp3');
+    // ── Audio ────────────────────────────────────────────────────────────────
+    this.load.audio('music_menu',      ['sounds/music-menu.mp3']);
+    this.load.audio('music_fight',     ['sounds/music-fight.mp3']);
+    this.load.audio('music_boss',      ['sounds/music-boss.mp3']);
+    this.load.audio('sfx_punch_light', ['sounds/sfx_punch_light.mp3', 'sounds/sfx_punch_light.wav']);
+    this.load.audio('sfx_punch_heavy', ['sounds/sfx_punch_heavy.mp3', 'sounds/sfx_punch_heavy.wav']);
+    this.load.audio('sfx_hit',         ['sounds/sfx_hit.mp3',         'sounds/sfx_hit.wav']);
+    this.load.audio('sfx_jump',        ['sounds/sfx_jump.mp3',        'sounds/sfx_jump.wav']);
+    this.load.audio('sfx_whoosh',      ['sounds/sfx_whoosh.mp3',      'sounds/sfx_whoosh.wav']);
+    this.load.audio('sfx_powerup',     ['sounds/sfx_powerup.mp3',     'sounds/sfx_powerup.wav']);
+    this.load.audio('sfx_bell',        ['sounds/sfx_bell.mp3',        'sounds/sfx_bell.wav']);
+    this.load.audio('sfx_crowd_cheer', ['sounds/sfx_crowd_cheer.mp3', 'sounds/sfx_crowd_cheer.wav']);
   }
 
   create() {
