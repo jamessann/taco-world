@@ -136,19 +136,104 @@ class MenuScene extends Phaser.Scene {
 
     bg.on('pointerover',  () => { bg.setAlpha(0.85); txt.setScale(1.05); });
     bg.on('pointerout',   () => { bg.setAlpha(1);    txt.setScale(1);    });
-    bg.on('pointerdown',  () => {
-      this.scene.start('FightScene', {
-        mode: 'PRACTICE', difficulty: 'practice',
-        roundNumber: 1, p1Wins: 0, p2Wins: 0,
-        isBossRound: false, isTiebreaker: false,
-      });
-    });
+    bg.on('pointerdown',  () => this._showPracticeEnemySelect());
 
-    // Small label underneath
     this.add.text(x, y + 24, 'Speed boost  •  Weak enemies  •  25 hits', {
       fontSize: '10px', fontFamily: 'Arial',
       fill: '#aaffaa', stroke: '#000', strokeThickness: 2,
     }).setOrigin(0.5).setDepth(2);
+  }
+
+  _showPracticeEnemySelect() {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    const els = []; // collect all objects for cleanup
+
+    const destroy = () => els.forEach(o => { if (o && o.destroy) o.destroy(); });
+
+    // Dark backdrop (also acts as a click-outside cancel)
+    const backdrop = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.78)
+      .setDepth(30).setInteractive();
+    els.push(backdrop);
+
+    // Panel
+    const panel = this.add.rectangle(W / 2, H / 2 + 10, 680, 300, 0x12122a)
+      .setStrokeStyle(3, 0x27ae60).setDepth(31);
+    els.push(panel);
+
+    // Title
+    els.push(this.add.text(W / 2, H / 2 - 120, 'PRACTICE — Choose Your Opponent', {
+      fontSize: '22px', fontFamily: 'Arial Black, Arial',
+      fill: '#27ae60', stroke: '#000000', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(32));
+
+    // Enemy cards
+    const cards = [
+      {
+        label: 'TACO GIRL',
+        sub:   'Classic sparring partner',
+        color: 0xcc3399,
+        x:     W / 2 - 215,
+        data:  { isBossRound: false, isSuperBossRound: false },
+      },
+      {
+        label: 'TACO BOSS',
+        sub:   'Giant Taco, weak mode',
+        color: 0xcc4400,
+        x:     W / 2,
+        data:  { isBossRound: true, bossChallenger: 'P1', isSuperBossRound: false },
+      },
+      {
+        label: 'SUPER TACO BOSS',
+        sub:   'Bigger  •  No enrage',
+        color: 0x770000,
+        x:     W / 2 + 215,
+        data:  { isBossRound: true, bossChallenger: 'P1', isSuperBossRound: true },
+      },
+    ];
+
+    cards.forEach(card => {
+      const cardBg = this.add.rectangle(card.x, H / 2 + 20, 190, 130, card.color)
+        .setStrokeStyle(3, 0xffffff)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(32);
+
+      const cardLbl = this.add.text(card.x, H / 2, card.label, {
+        fontSize: '15px', fontFamily: 'Arial Black, Arial',
+        fill: '#ffffff', stroke: '#000000', strokeThickness: 3,
+        align: 'center', wordWrap: { width: 175 },
+      }).setOrigin(0.5).setDepth(33);
+
+      const cardSub = this.add.text(card.x, H / 2 + 44, card.sub, {
+        fontSize: '11px', fontFamily: 'Arial',
+        fill: '#ffddcc', stroke: '#000', strokeThickness: 2,
+        align: 'center',
+      }).setOrigin(0.5).setDepth(33);
+
+      cardBg.on('pointerover', () => cardBg.setStrokeStyle(4, 0xFFD700));
+      cardBg.on('pointerout',  () => cardBg.setStrokeStyle(3, 0xffffff));
+      cardBg.on('pointerdown', () => {
+        destroy();
+        this.scene.start('FightScene', {
+          mode: 'PRACTICE', difficulty: 'practice',
+          roundNumber: 1, p1Wins: 0, p2Wins: 0,
+          isTiebreaker: false,
+          ...card.data,
+        });
+      });
+
+      els.push(cardBg, cardLbl, cardSub);
+    });
+
+    // Back button
+    const back = this.add.text(W / 2, H / 2 + 120, '← Back', {
+      fontSize: '15px', fontFamily: 'Arial',
+      fill: '#aaaaaa', stroke: '#000', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(32).setInteractive({ useHandCursor: true });
+    back.on('pointerover', () => back.setFill('#ffffff'));
+    back.on('pointerout',  () => back.setFill('#aaaaaa'));
+    back.on('pointerdown', destroy);
+    els.push(back);
   }
 
   _makeBtn(x, y, label, fillColor, strokeColor, onClick) {

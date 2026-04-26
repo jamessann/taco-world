@@ -108,9 +108,15 @@ class FightScene extends Phaser.Scene {
     this.physics.add.collider(this.fighter2.rect, this._groundObj);
 
     // ── Hit allowance per difficulty ───────────────────────────────────────────
-    const hitsByDiff = { easy: 20, medium: 15, hard: 12, practice: 25 };
-    const maxHits    = hitsByDiff[this.difficulty] || 15;
-    [this.fighter1, this.fighter2].forEach(f => { f.hitsLeft = maxHits; f.maxHits = maxHits; });
+    const hitsByDiff  = { easy: 20,   medium: 15,   hard: 12,   practice: 25   };
+    const regenByDiff = { easy: 1500, medium: 1900, hard: 2350, practice: 2000 };
+    const maxHits     = hitsByDiff[this.difficulty]  || 15;
+    const regenMs     = regenByDiff[this.difficulty] || 2000;
+    [this.fighter1, this.fighter2].forEach(f => {
+      f.hitsLeft          = maxHits;
+      f.maxHits           = maxHits;
+      f._hitRegenInterval = regenMs;
+    });
 
     // ── Practice mode: permanent player speed boost ───────────────────────────
     if (this.mode === 'PRACTICE') {
@@ -966,7 +972,7 @@ class FightScene extends Phaser.Scene {
     if (!boss || !boss.isAlive) return;
 
     // ── Enrage at 50 % HP ────────────────────────────────────────────────────
-    if (!this._bossEnraged && boss.hp < boss.maxHp * 0.5) {
+    if (!this._bossEnraged && boss.hp < boss.maxHp * 0.5 && this.mode !== 'PRACTICE') {
       this._bossEnraged = true;
       boss.config.moveSpeed   = Math.round(boss.config.moveSpeed * 1.2);
       this._bossShootMin      = Math.round(this._bossShootMin * 0.5);

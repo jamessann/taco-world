@@ -25,9 +25,10 @@ class Fighter {
     this.cooldowns   = { light: 0, heavy: 0, hit: 0 };
 
     // ── Hit allowance (anti-mash) — set by FightScene based on difficulty ─────
-    this.hitsLeft            = 20;   // overridden by FightScene after construction
-    this.maxHits             = 20;
-    this._hitRegenTimer      = 0;    // ms since last hit regen tick
+    this.hitsLeft             = 20;    // overridden by FightScene after construction
+    this.maxHits              = 20;
+    this._hitRegenInterval    = 2000;  // ms per hit regen — overridden by FightScene
+    this._hitRegenTimer       = 0;
     this._outOfHitsPopupShown = false;
 
     // ── Counter window ────────────────────────────────────────────────────────
@@ -405,7 +406,7 @@ class Fighter {
     // ── Hit regen — 1 hit restored every 2.5 s ───────────────────────────────
     if (this.hitsLeft < this.maxHits) {
       this._hitRegenTimer += delta;
-      if (this._hitRegenTimer >= 2500) {
+      if (this._hitRegenTimer >= this._hitRegenInterval) {
         this._hitRegenTimer = 0;
         this.hitsLeft = Math.min(this.maxHits, this.hitsLeft + 1);
       }
